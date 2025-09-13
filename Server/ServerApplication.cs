@@ -13,6 +13,7 @@ public class ServerApplication
     private readonly AppConfig _config;
     private Socket? _serverSocket;
     private bool _isRunning;
+    private readonly ClientManager _clientManager;
 
     /// <summary>
     /// Initializes a new instance of the ServerApplication
@@ -21,6 +22,7 @@ public class ServerApplication
     public ServerApplication(AppConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        _clientManager = ClientManager.Instance;
     }
 
     /// <summary>
@@ -33,8 +35,14 @@ public class ServerApplication
             InitializeServer();
             _isRunning = true;
             
-            Console.WriteLine($"Server listening on {_config.ServerIp}:{_config.ServerPort}");
-            Console.WriteLine("Waiting for clients...");
+            Console.WriteLine($"Servidor escuchando en {_config.ServerIp}:{_config.ServerPort}");
+            Console.WriteLine("Esperando clientes...");
+            Console.WriteLine($"Escriba '{Common.Protocol.ProtocolConstants.EXIT_COMMAND}' para cerrar el servidor de forma controlada");
+
+            // Start console command handler in a separate thread
+            var consoleThread = new Thread(HandleConsoleCommands);
+            consoleThread.IsBackground = true;
+            consoleThread.Start();
 
             // Main server loop
             while (_isRunning)
@@ -43,7 +51,7 @@ public class ServerApplication
                 {
                     // Accept incoming connection (blocking until a client connects)
                     Socket clientSocket = _serverSocket!.Accept();
-                    Console.WriteLine("Client connected");
+                    Console.WriteLine("Cliente conectado");
 
                     // Handle each client in a separate thread
                     var clientHandler = new ClientHandler(clientSocket);
@@ -58,14 +66,14 @@ public class ServerApplication
                 {
                     if (_isRunning)
                     {
-                        Console.WriteLine($"Error accepting client connection: {ex.Message}");
+                        Console.WriteLine($"Error aceptando conexión de cliente: {ex.Message}");
                     }
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Server startup error: {ex.Message}");
+            Console.WriteLine($"Error al iniciar el servidor: {ex.Message}");
         }
     }
 
@@ -74,7 +82,15 @@ public class ServerApplication
     /// </summary>
     public void Stop()
     {
+        if (!_isRunning)
+        {
+            return; // Already stopped
+        }
+        
         _isRunning = false;
+        
+        // Disconnect all clients first
+        _clientManager.DisconnectAllClients();
         
         try
         {
@@ -89,7 +105,42 @@ public class ServerApplication
             _serverSocket?.Close();
         }
         
-        Console.WriteLine("Server stopped");
+        Console.WriteLine("Servidor cerrado");
+    }
+
+    /// <summary>
+    /// Handles console commands for server control
+    /// </summary>
+    private void HandleConsoleCommands()
+    {
+        while (_isRunning)
+        {
+            try
+            {
+                string? input = Console.ReadLine();
+                
+                if (string.IsNullOrWhiteSpace(input))
+                    continue;
+                
+                string command = input.Trim().ToLower();
+                
+                switch (command)
+                {
+                    case Common.Protocol.ProtocolConstants.EXIT_COMMAND:
+                        Console.WriteLine("Iniciando cierre controlado del servidor...");
+                        Stop();
+                        return;
+                        
+                    default:
+                        Console.WriteLine($"Comando desconocido: '{input}'. Escriba '{Common.Protocol.ProtocolConstants.EXIT_COMMAND}' para cerrar el servidor.");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error procesando comando: {ex.Message}");
+            }
+        }
     }
 
     /// <summary>

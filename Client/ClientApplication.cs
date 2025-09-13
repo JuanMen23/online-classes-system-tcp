@@ -29,15 +29,15 @@ public class ClientApplication
     {
         try
         {
-            Console.WriteLine("Starting Client Application...");
-            Console.WriteLine("Connecting to server...");
+            Console.WriteLine("Iniciando aplicación del cliente...");
+            Console.WriteLine("Conectando al servidor...");
 
             // Connect to server
             _socketService.Connect();
 
-            Console.WriteLine("Connected to server!");
-            Console.WriteLine("Type a message and press ENTER to send it");
-            Console.WriteLine($"Type '{Common.Protocol.ProtocolConstants.EXIT_COMMAND}' to exit");
+            Console.WriteLine("¡Conectado al servidor!");
+            Console.WriteLine("Escriba un mensaje y presione ENTER para enviarlo");
+            Console.WriteLine($"Escriba '{Common.Protocol.ProtocolConstants.EXIT_COMMAND}' para salir");
 
             _isRunning = true;
 
@@ -68,13 +68,13 @@ public class ClientApplication
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error reading input: {ex.Message}");
+                    Console.WriteLine($"Error leyendo entrada: {ex.Message}");
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Client startup error: {ex.Message}");
+            Console.WriteLine($"Error al iniciar el cliente: {ex.Message}");
         }
         finally
         {
@@ -95,12 +95,12 @@ public class ClientApplication
                 
                 if (message != null)
                 {
-                    Console.WriteLine($"Server response: {message}");
+                    Console.WriteLine($"Respuesta del servidor: {message}");
                 }
                 else
                 {
                     // Server disconnected
-                    Console.WriteLine("Server disconnected");
+                    Console.WriteLine("Servidor desconectado");
                     _isRunning = false;
                     break;
                 }
@@ -110,7 +110,7 @@ public class ClientApplication
         {
             if (_isRunning)
             {
-                Console.WriteLine($"Error receiving messages: {ex.Message}");
+                Console.WriteLine($"Error recibiendo mensajes: {ex.Message}");
             }
         }
     }
@@ -120,8 +120,8 @@ public class ClientApplication
     /// </summary>
     private void Disconnect()
     {
-        Console.WriteLine("Disconnecting...");
+        Console.WriteLine("Desconectando...");
         _socketService.Disconnect();
-        Console.WriteLine("Disconnected");
+        Console.WriteLine("Desconectado");
     }
 }
