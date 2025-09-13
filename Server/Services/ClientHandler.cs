@@ -1,17 +1,18 @@
 using System.Net.Sockets;
 using System.Text;
+using Common.Protocol;
 
 namespace Server.Services;
 
 /// <summary>
-/// Handles individual client connections and communication
+/// Handles individual client connections and communication using the protocol
 /// </summary>
 public class ClientHandler
 {
     private readonly Socket _clientSocket;
-    private readonly byte[] _buffer;
     private readonly ClientManager _clientManager;
     private readonly ClientState _state;
+    private readonly ProtocolHandler _protocolHandler;
     
     public Guid Id { get; }
 
@@ -23,8 +24,8 @@ public class ClientHandler
     {
         _clientSocket = clientSocket ?? throw new ArgumentNullException(nameof(clientSocket));
         _clientManager = ClientManager.Instance;
-        _buffer = new byte[Common.Protocol.ProtocolConstants.MAX_BUFFER_SIZE];
         _state = new ClientState();
+        _protocolHandler = new ProtocolHandler();
         Id = Guid.NewGuid();
     }
 
@@ -66,34 +67,82 @@ public class ClientHandler
     }
 
     /// <summary>
-    /// Processes incoming messages from the client
+    /// Processes incoming protocol messages from the client
     /// </summary>
     private void ProcessClientMessages()
     {
         while (_state.IsConnected)
         {
-            int received = _clientSocket.Receive(_buffer);
-
-            if (received == 0)
+            try
             {
+                // Receive protocol message from client
+                var receivedMessage = _protocolHandler.ReceiveMessage(_clientSocket);
+                Console.WriteLine($"Recibido: {receivedMessage}");
+                
+                // Process the command (for now, just echo back)
+                ProcessCommand(receivedMessage);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Connection closed"))
+            {
+                // Client disconnected gracefully
                 _state.MarkAsDisconnectedNaturally();
             }
-            else
+            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionAborted)
             {
-                ProcessReceivedMessage(received);
+                Console.WriteLine("Servidor se cerró - desconectando cliente");
+                _state.MarkAsDisconnectedNaturally();
+            }
+            catch (Exception ex) when (ex.Message.Contains("Software caused connection abort"))
+            {
+                // Conexión abortada por cierre del servidor - esto es esperado, no es un error
+                _state.MarkAsDisconnectedNaturally();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error recibiendo mensaje del protocolo: {ex.Message}");
+                _state.MarkAsDisconnectedNaturally();
             }
         }
     }
 
     /// <summary>
-    /// Processes a received message
+    /// Processes the received command and sends appropriate response
     /// </summary>
-    /// <param name="received">Number of bytes received</param>
-    private void ProcessReceivedMessage(int received)
+    /// <param name="message">The received protocol message</param>
+    private void ProcessCommand(ProtocolMessage message)
     {
-        string message = Encoding.UTF8.GetString(_buffer, 0, received);
-        Console.WriteLine($"Cliente dice: {message}");
-        EchoMessage(message);
+        try
+        {
+            // For now, just echo back the command with a response header
+            var responseMessage = new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                message.Command,
+                $"Echo: {message.Data}"
+            );
+
+            _protocolHandler.SendMessage(_clientSocket, responseMessage);
+            Console.WriteLine($"Respuesta enviada: {responseMessage}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error procesando comando: {ex.Message}");
+            
+            // Send error response
+            try
+            {
+                var errorMessage = new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Internal server error"
+                );
+                _protocolHandler.SendMessage(_clientSocket, errorMessage);
+            }
+            catch
+            {
+                // If we can't send error response, just log it
+                Console.WriteLine("Error al enviar respuesta de error");
+            }
+        }
     }
 
     /// <summary>
@@ -138,24 +187,6 @@ public class ClientHandler
         if (_state.IsConnected)
         {
             DisconnectClient();
-        }
-    }
-
-    /// <summary>
-    /// Sends an echo message back to the client
-    /// </summary>
-    /// <param name="message">The message to echo</param>
-    private void EchoMessage(string message)
-    {
-        try
-        {
-            string echoMessage = $"Echo: {message}";
-            byte[] data = Encoding.UTF8.GetBytes(echoMessage);
-            _clientSocket.Send(data);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error enviando mensaje echo: {ex.Message}");
         }
     }
 
