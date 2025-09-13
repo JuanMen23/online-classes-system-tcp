@@ -10,6 +10,10 @@ public class ClientHandler
 {
     private readonly Socket _clientSocket;
     private readonly byte[] _buffer;
+    private readonly ClientManager _clientManager;
+    private readonly ClientState _state;
+    
+    public Guid Id { get; }
 
     /// <summary>
     /// Initializes a new instance of the ClientHandler
@@ -18,7 +22,10 @@ public class ClientHandler
     public ClientHandler(Socket clientSocket)
     {
         _clientSocket = clientSocket ?? throw new ArgumentNullException(nameof(clientSocket));
+        _clientManager = ClientManager.Instance;
         _buffer = new byte[Common.Protocol.ProtocolConstants.MAX_BUFFER_SIZE];
+        _state = new ClientState();
+        Id = Guid.NewGuid();
     }
 
     /// <summary>
@@ -26,46 +33,109 @@ public class ClientHandler
     /// </summary>
     public void HandleClient()
     {
-        bool clientIsConnected = true;
-
+        RegisterClient();
+        
         try
         {
-            while (clientIsConnected)
-            {
-                // Receive data from client
-                int received = _clientSocket.Receive(_buffer);
-
-                // received == 0 means the client closed the connection gracefully
-                if (received == 0)
-                {
-                    clientIsConnected = false;
-                }
-                else
-                {
-                    // Decode only the valid bytes [0..received)
-                    string message = Encoding.UTF8.GetString(_buffer, 0, received);
-                    Console.WriteLine($"Client says: {message}");
-
-                    // Echo the message back to the client
-                    EchoMessage(message);
-                }
-            }
+            ProcessClientMessages();
         }
         catch (SocketException ex)
         {
-            // Typical exception if client disconnects abruptly
-            Console.WriteLine($"Client disconnected abruptly: {ex.Message}");
+            HandleSocketException(ex);
         }
         catch (ObjectDisposedException)
         {
-            // Socket was already closed from elsewhere
-            Console.WriteLine("Client socket was disposed");
+            HandleObjectDisposedException();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error handling client: {ex.Message}");
+            HandleGenericException(ex);
         }
         finally
+        {
+            CleanupClient();
+        }
+    }
+
+    /// <summary>
+    /// Registers the client with the manager
+    /// </summary>
+    private void RegisterClient()
+    {
+        _clientManager.AddClient(this);
+    }
+
+    /// <summary>
+    /// Processes incoming messages from the client
+    /// </summary>
+    private void ProcessClientMessages()
+    {
+        while (_state.IsConnected)
+        {
+            int received = _clientSocket.Receive(_buffer);
+
+            if (received == 0)
+            {
+                _state.MarkAsDisconnectedNaturally();
+            }
+            else
+            {
+                ProcessReceivedMessage(received);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Processes a received message
+    /// </summary>
+    /// <param name="received">Number of bytes received</param>
+    private void ProcessReceivedMessage(int received)
+    {
+        string message = Encoding.UTF8.GetString(_buffer, 0, received);
+        Console.WriteLine($"Cliente dice: {message}");
+        EchoMessage(message);
+    }
+
+    /// <summary>
+    /// Handles socket exceptions
+    /// </summary>
+    /// <param name="ex">The socket exception</param>
+    private void HandleSocketException(SocketException ex)
+    {
+        if (_state.ShouldShowDisconnectMessages())
+        {
+            Console.WriteLine($"Cliente desconectado abruptamente: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles object disposed exceptions
+    /// </summary>
+    private void HandleObjectDisposedException()
+    {
+        if (_state.ShouldShowDisconnectMessages())
+        {
+            Console.WriteLine("Socket del cliente fue liberado");
+        }
+    }
+
+    /// <summary>
+    /// Handles generic exceptions
+    /// </summary>
+    /// <param name="ex">The exception</param>
+    private void HandleGenericException(Exception ex)
+    {
+        Console.WriteLine($"Error manejando cliente: {ex.Message}");
+    }
+
+    /// <summary>
+    /// Cleans up the client connection
+    /// </summary>
+    private void CleanupClient()
+    {
+        _clientManager.RemoveClient(this);
+        
+        if (_state.IsConnected)
         {
             DisconnectClient();
         }
@@ -85,14 +155,28 @@ public class ClientHandler
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error sending echo message: {ex.Message}");
+            Console.WriteLine($"Error enviando mensaje echo: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Disconnects the client cleanly
     /// </summary>
-    private void DisconnectClient()
+    public void DisconnectClient()
+    {
+        if (!_state.IsConnected)
+        {
+            return; // Already disconnected
+        }
+        
+        _state.MarkAsDisconnectedByServer();
+        CloseSocket();
+    }
+
+    /// <summary>
+    /// Closes the client socket
+    /// </summary>
+    private void CloseSocket()
     {
         try
         {
@@ -106,7 +190,5 @@ public class ClientHandler
         {
             _clientSocket.Close();
         }
-
-        Console.WriteLine("Client disconnected");
     }
 }

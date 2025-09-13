@@ -1,7 +1,7 @@
 ﻿using Common.Config;
 using Server;
 
-Console.WriteLine("Starting Server Application...");
+Console.WriteLine("Iniciando aplicación del servidor...");
 
 // Create configuration
 var config = new AppConfig();
@@ -15,7 +15,7 @@ try
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"Fatal error: {ex.Message}");
+    Console.WriteLine($"Error fatal: {ex.Message}");
 }
 finally
 {
