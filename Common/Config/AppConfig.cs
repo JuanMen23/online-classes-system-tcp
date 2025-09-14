@@ -18,11 +18,6 @@ public class AppConfig
     public int ServerPort { get; set; } = Protocol.ProtocolConstants.DEFAULT_SERVER_PORT;
     
     /// <summary>
-    /// Buffer size for socket communication
-    /// </summary>
-    public int BufferSize { get; set; } = Protocol.ProtocolConstants.MAX_BUFFER_SIZE;
-    
-    /// <summary>
     /// Maximum number of queued connections
     /// </summary>
     public int MaxBacklogConnections { get; set; } = Protocol.ProtocolConstants.MAX_BACKLOG_CONNECTIONS;

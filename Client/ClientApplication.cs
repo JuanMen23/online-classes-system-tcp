@@ -1,4 +1,5 @@
 using Common.Config;
+using Common.Protocol;
 using Client.Services;
 
 namespace Client;
@@ -62,8 +63,13 @@ public class ClientApplication
                     }
                     else
                     {
-                        // Send message to server
-                        _socketService.SendMessage(message);
+                        // Send protocol message to server
+                        var protocolMessage = new ProtocolMessage(
+                            ProtocolConstants.HEADER_REQUEST,
+                            ProtocolConstants.CMD_LOGIN, // For now, use LOGIN command
+                            message
+                        );
+                        _socketService.SendMessage(protocolMessage);
                     }
                 }
                 catch (Exception ex)
@@ -91,11 +97,11 @@ public class ClientApplication
         {
             while (_isRunning)
             {
-                string? message = _socketService.ReceiveMessage();
+                ProtocolMessage? message = _socketService.ReceiveMessage();
                 
                 if (message != null)
                 {
-                    Console.WriteLine($"Respuesta del servidor: {message}");
+                    Console.WriteLine($"Respuesta del servidor: {message.Data}");
                 }
                 else
                 {
@@ -110,7 +116,9 @@ public class ClientApplication
         {
             if (_isRunning)
             {
-                Console.WriteLine($"Error recibiendo mensajes: {ex.Message}");
+                Console.WriteLine($"Servidor desconectado: {ex.Message}");
+                Console.WriteLine("Presione ENTER para salir...");
+                _isRunning = false; // Stop the application
             }
         }
     }
