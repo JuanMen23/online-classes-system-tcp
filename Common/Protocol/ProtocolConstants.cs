@@ -51,4 +51,9 @@ public static class ProtocolConstants
     // Legacy / Utility
     // ========================
     public const string EXIT_COMMAND = "exit";  // Para salir del cliente
+    public const string OK_COMMAND = "ok";
+    public const string ERROR_COMMAND = "error";
+    public const string ERROR_USER_EXISTS_COMMAND = "error_user_exists";
+    public const string ERROR_INVALID_CREDENTIALS = "error_invalid_credentials";
+    public const string ERROR_USER_ALREADY_LOGGED_IN = "error_user_is_already_logged_in";
 }
