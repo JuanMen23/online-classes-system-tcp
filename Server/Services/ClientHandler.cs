@@ -1,6 +1,8 @@
 using System.Net.Sockets;
 using System.Text;
 using Common.Protocol;
+using Server.ClassSession; 
+using Server.Services; 
 
 namespace Server.Services;
 
@@ -13,6 +15,7 @@ public class ClientHandler
     private readonly ClientManager _clientManager;
     private readonly ClientState _state;
     private readonly ProtocolHandler _protocolHandler;
+    private readonly ClassManager _classManager;
     
     public Guid Id { get; }
 
@@ -26,6 +29,7 @@ public class ClientHandler
         _clientManager = ClientManager.Instance;
         _state = new ClientState();
         _protocolHandler = new ProtocolHandler();
+        _classManager = ClassManager.Instance;
         Id = Guid.NewGuid();
     }
 
@@ -113,21 +117,28 @@ public class ClientHandler
     {
         try
         {
-            // For now, just echo back the command with a response header
-            var responseMessage = new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                message.Command,
-                $"Echo: {message.Data}"
-            );
+            switch (message.Command)
+            {
+                case ProtocolConstants.CMD_CREATE_CLASS: 
+                    HandleCreateClass(message);
+                    break;
 
-            _protocolHandler.SendMessage(_clientSocket, responseMessage);
-            Console.WriteLine($"Respuesta enviada: {responseMessage}");
+                default:
+                    // Echo por defecto
+                    var echoResponse = new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        message.Command,
+                        $"Echo: {message.Data}"
+                    );
+                    _protocolHandler.SendMessage(_clientSocket, echoResponse);
+                    Console.WriteLine($"Respuesta enviada: {echoResponse}");
+                    break;
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error procesando comando: {ex.Message}");
             
-            // Send error response
             try
             {
                 var errorMessage = new ProtocolMessage(
@@ -139,11 +150,45 @@ public class ClientHandler
             }
             catch
             {
-                // If we can't send error response, just log it
                 Console.WriteLine("Error al enviar respuesta de error");
             }
         }
     }
+    
+    /// <summary>
+    /// Processes the ClassSession creation (CR2)
+    /// </summary>
+    private void HandleCreateClass(ProtocolMessage message)
+    {
+        // Data esperada: nombre|descripcion|cupos|max|fecha|duracion|imagenBase64
+        var parts = message.Data.Split('|');
+        string nombre = parts[0];
+        string descripcion = parts[1];
+        int cupos = int.Parse(parts[2]);
+        DateTime fecha = DateTime.Parse(parts[3]);
+        int duracion = int.Parse(parts[4]);
+        string? imagenBase64 = parts.Length > 5 ? parts[5] : null;
+
+        string? imagenPath = null;
+        if (!string.IsNullOrEmpty(imagenBase64))
+        {
+            Directory.CreateDirectory("Images");
+            imagenPath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
+            File.WriteAllBytes(imagenPath, Convert.FromBase64String(imagenBase64));
+        }
+
+        var clase = _classManager.CreateClass(nombre, descripcion, cupos, fecha, duracion, imagenPath);
+
+        var response = new ProtocolMessage(
+            ProtocolConstants.HEADER_RESPONSE,
+            ProtocolConstants.CMD_CREATE_CLASS,
+            $"OK|{clase.Id}|{clase.Link}"
+        );
+
+        _protocolHandler.SendMessage(_clientSocket, response);
+        Console.WriteLine($"Clase creada: {clase.Id} ({clase.Nombre})");
+    }
+
 
     /// <summary>
     /// Handles socket exceptions
