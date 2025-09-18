@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using Common.Protocol;
 
 namespace Server.Services;
 
@@ -51,7 +50,7 @@ public class ClientManager
     {
         if (client != null)
         {
-            LogoutUser(client.Id);
+            UserService.Instance.LogoutUser(client.Id);
             if (_connectedClients.TryRemove(client.Id, out _))
             {
                 Console.WriteLine($"Cliente desconectado. Total: {GetConnectedClientsCount()}");
@@ -109,45 +108,6 @@ public class ClientManager
     public List<ClientHandler> GetAllClients()
     {
         return _connectedClients.Values.ToList();
-    }
-    
-    // User's handling
-
-    public string RegisterUser(string username, string password)
-    {
-        var newUser = new User.User { Username = username, Password = password };
-        if (_registeredUsers.TryAdd(username, newUser))
-        {
-            Console.WriteLine($"✅ Usuario registrado exitosamente: '{username}'");
-            return ProtocolConstants.OK_COMMAND;
-        }
-        return ProtocolConstants.ERROR_USER_EXISTS_COMMAND;
-    }
-
-    public string LoginUser(Guid clientId, string username, string password)
-    {
-        if (_registeredUsers.TryGetValue(username, out User.User user) && user.Password == password)
-        {
-            // Avoid double login
-            if (_activeSessions.Values.Contains(username))
-            {
-                return ProtocolConstants.ERROR_USER_ALREADY_LOGGED_IN;
-            }
-
-            _activeSessions.TryAdd(clientId, username);
-            Console.WriteLine($"➡️ Usuario inició sesión: '{username}' (ID de conexión: {clientId})");
-            return ProtocolConstants.OK_COMMAND;
-        }
-
-        return ProtocolConstants.ERROR_INVALID_CREDENTIALS;
-    }
-
-    public void LogoutUser(Guid clientId)
-    {
-        if (_activeSessions.TryRemove(clientId, out string username))
-        {
-            Console.WriteLine($"⬅️ Usuario cerró sesión: '{username}' (ID de conexión: {clientId})");
-        }
     }
 
 }

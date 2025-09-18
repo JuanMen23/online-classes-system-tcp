@@ -39,6 +39,28 @@ public class ClassService
         _classes.Add(newClass);
         return newClass;
     }
+    
+    public ClassSession CreateClassWithDetails(string name, string description, int maxSeats,
+        DateTime startDateTime, int durationMinutes, string? imageBase64)
+    {
+        string? imagePath = null;
+        if (!string.IsNullOrEmpty(imageBase64))
+        {
+            byte[] imageBytes = Convert.FromBase64String(imageBase64);
+            if (imageBytes.Length > 5 * 1024 * 1024)
+            {
+                throw new ArgumentException("Imagen demasiado grande (máximo 5MB)");
+            }
+            Directory.CreateDirectory("Images");
+            imagePath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
+            File.WriteAllBytes(imagePath, imageBytes);
+        }
+        
+        var createdClass = CreateClass(name, description, maxSeats, startDateTime, durationMinutes, imagePath);
+        
+        Console.WriteLine($"Clase creada: {createdClass.Id} ({createdClass.Name})");
+        return createdClass;
+    }
 
     public IEnumerable<ClassSession> GetAllClasses() => _classes.ToList();
 }
