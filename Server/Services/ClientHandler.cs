@@ -133,24 +133,72 @@ public class ClientHandler
     }
 
     private void HandleCreateClass(ProtocolMessage message)
+{
+    try
     {
         // Expected data: name|description|maxSeats|startDateTime|duration|imageBase64
         var parts = message.Data.Split('|');
-        string name = parts[0];
-        string description = parts[1];
-        int maxSeats = int.Parse(parts[2]);
-        DateTime startDateTime = DateTime.Parse(parts[3]);
-        int durationMinutes = int.Parse(parts[4]);
-        string? imageBase64 = parts.Length > 5 ? parts[5] : null;
 
-        string? imagePath = null;
-        if (!string.IsNullOrEmpty(imageBase64))
+        if (parts.Length < 5)
         {
-            Directory.CreateDirectory("Images");
-            imagePath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
-            File.WriteAllBytes(imagePath, Convert.FromBase64String(imageBase64));
+            SendErrorResponse("Datos insuficientes para crear la clase");
+            return;
         }
 
+        string name = parts[0];
+        string description = parts[1];
+
+        if (!int.TryParse(parts[2], out int maxSeats) || maxSeats <= 0)
+        {
+            SendErrorResponse("Número de cupos inválido");
+            return;
+        }
+
+        if (!DateTime.TryParse(parts[3], out DateTime startDateTime))
+        {
+            SendErrorResponse("Fecha inválida");
+            return;
+        }
+
+        if (!int.TryParse(parts[4], out int durationMinutes) || durationMinutes <= 0)
+        {
+            SendErrorResponse("Duración inválida");
+            return;
+        }
+
+        string? imageBase64 = parts.Length > 5 ? parts[5] : null;
+        string? imagePath = null;
+
+        if (!string.IsNullOrEmpty(imageBase64))
+        {
+            try
+            {
+                byte[] imageBytes = Convert.FromBase64String(imageBase64);
+
+                // Limit file size to 5 MB
+                if (imageBytes.Length > 5 * 1024 * 1024)
+                {
+                    SendErrorResponse("Imagen demasiado grande (máximo 5MB)");
+                    return;
+                }
+
+                Directory.CreateDirectory("Images");
+                imagePath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
+                File.WriteAllBytes(imagePath, imageBytes);
+            }
+            catch (FormatException)
+            {
+                SendErrorResponse("Formato de imagen Base64 inválido");
+                return;
+            }
+            catch (Exception ex)
+            {
+                SendErrorResponse($"Error guardando imagen: {ex.Message}");
+                return;
+            }
+        }
+
+        // Create class safely
         var createdClass = _classService.CreateClass(name, description, maxSeats, startDateTime, durationMinutes, imagePath);
 
         var response = new ProtocolMessage(
@@ -162,6 +210,23 @@ public class ClientHandler
         _protocolHandler.SendMessage(_clientSocket, response);
         Console.WriteLine($"Clase creada: {createdClass.Id} ({createdClass.Name})");
     }
+    catch (Exception ex)
+    {
+        // Fallback general error
+        SendErrorResponse($"Error inesperado: {ex.Message}");
+    }
+}
+
+private void SendErrorResponse(string errorMessage)
+{
+    var errorResponse = new ProtocolMessage(
+        ProtocolConstants.HEADER_RESPONSE,
+        ProtocolConstants.CMD_ERROR,
+        errorMessage
+    );
+    _protocolHandler.SendMessage(_clientSocket, errorResponse);
+    Console.WriteLine($"[ERROR] {errorMessage}");
+}
 
     private void HandleSocketException(SocketException ex)
     {

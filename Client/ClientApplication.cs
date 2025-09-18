@@ -100,42 +100,88 @@ public class ClientApplication
     /// Asks user for class data and sends CMD_CREATE_CLASS request
     /// </summary>
     private void CreateClass()
+{
+    Console.Write("Nombre: ");
+    string name = Console.ReadLine() ?? "";
+
+    Console.Write("Descripción: ");
+    string description = Console.ReadLine() ?? "";
+
+    // Cupos
+    int maxSeats;
+    while (true)
     {
-        Console.Write("Nombre: ");
-        string name = Console.ReadLine() ?? "";
-
-        Console.Write("Descripción: ");
-        string description = Console.ReadLine() ?? "";
-
         Console.Write("Cupos máximos: ");
-        int maxSeats = int.TryParse(Console.ReadLine(), out var c) ? c : 0;
-
-        Console.Write("Duración (minutos): ");
-        int duration = int.TryParse(Console.ReadLine(), out var d) ? d : 0;
-
-        Console.Write("Fecha y hora (yyyy-MM-dd HH:mm) o vacío para ahora: ");
-        string inputDate = Console.ReadLine() ?? "";
-        DateTime startDateTime = string.IsNullOrEmpty(inputDate) ? DateTime.Now : DateTime.Parse(inputDate);
-
-        Console.Write("Ruta imagen (opcional): ");
-        string imagePath = Console.ReadLine() ?? "";
-        string imageBase64 = "";
-        if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
-        {
-            imageBase64 = Convert.ToBase64String(File.ReadAllBytes(imagePath));
-        }
-
-        string data = $"{name}|{description}|{maxSeats}|{startDateTime:yyyy-MM-dd HH:mm}|{duration}|{imageBase64}";
-
-        var request = new ProtocolMessage(
-            ProtocolConstants.HEADER_REQUEST,
-            ProtocolConstants.CMD_CREATE_CLASS,
-            data
-        );
-
-        _socketService.SendMessage(request);
-        Console.WriteLine("Solicitud de creación de clase enviada.");
+        string input = Console.ReadLine() ?? "";
+        if (int.TryParse(input, out maxSeats) && maxSeats > 0)
+            break;
+        Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
     }
+
+    // Duración
+    int duration;
+    while (true)
+    {
+        Console.Write("Duración (minutos): ");
+        string input = Console.ReadLine() ?? "";
+        if (int.TryParse(input, out duration) && duration > 0)
+            break;
+        Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
+    }
+
+    // Fecha
+    DateTime startDateTime;
+    while (true)
+    {
+        Console.Write("Fecha y hora (yyyy-MM-dd HH:mm) o vacío para ahora: ");
+        string input = Console.ReadLine() ?? "";
+        if (string.IsNullOrEmpty(input))
+        {
+            startDateTime = DateTime.Now;
+            break;
+        }
+        if (DateTime.TryParse(input, out startDateTime))
+            break;
+
+        Console.WriteLine("⚠️ Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
+    }
+
+    // Imagen
+    Console.Write("Ruta imagen (opcional): ");
+    string imagePath = Console.ReadLine() ?? "";
+    string imageBase64 = "";
+    if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
+    {
+        try
+        {
+            byte[] bytes = File.ReadAllBytes(imagePath);
+
+            if (bytes.Length > 5 * 1024 * 1024)
+            {
+                Console.WriteLine("⚠️ Imagen demasiado grande (máximo 5MB). No se enviará.");
+            }
+            else
+            {
+                imageBase64 = Convert.ToBase64String(bytes);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ Error leyendo la imagen: {ex.Message}");
+        }
+    }
+
+    string data = $"{name}|{description}|{maxSeats}|{startDateTime:yyyy-MM-dd HH:mm}|{duration}|{imageBase64}";
+
+    var request = new ProtocolMessage(
+        ProtocolConstants.HEADER_REQUEST,
+        ProtocolConstants.CMD_CREATE_CLASS,
+        data
+    );
+
+    _socketService.SendMessage(request);
+    Console.WriteLine("Solicitud de creación de clase enviada.");
+}
 
     private void ReceiveMessages()
     {
