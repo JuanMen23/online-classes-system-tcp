@@ -1,8 +1,7 @@
 using System.Net.Sockets;
-using System.Text;
 using Common.Protocol;
-using Server.ClassSession; 
-using Server.Services; 
+using Server.ClassSession;
+using Server.Services;
 
 namespace Server.Services;
 
@@ -15,31 +14,24 @@ public class ClientHandler
     private readonly ClientManager _clientManager;
     private readonly ClientState _state;
     private readonly ProtocolHandler _protocolHandler;
-    private readonly ClassManager _classManager;
-    
+    private readonly ClassService _classService;
+
     public Guid Id { get; }
 
-    /// <summary>
-    /// Initializes a new instance of the ClientHandler
-    /// </summary>
-    /// <param name="clientSocket">The client socket to handle</param>
     public ClientHandler(Socket clientSocket)
     {
         _clientSocket = clientSocket ?? throw new ArgumentNullException(nameof(clientSocket));
         _clientManager = ClientManager.Instance;
         _state = new ClientState();
         _protocolHandler = new ProtocolHandler();
-        _classManager = ClassManager.Instance;
+        _classService = ClassService.Instance;
         Id = Guid.NewGuid();
     }
 
-    /// <summary>
-    /// Handles the client connection and processes incoming messages
-    /// </summary>
     public void HandleClient()
     {
         RegisterClient();
-        
+
         try
         {
             ProcessClientMessages();
@@ -62,33 +54,24 @@ public class ClientHandler
         }
     }
 
-    /// <summary>
-    /// Registers the client with the manager
-    /// </summary>
     private void RegisterClient()
     {
         _clientManager.AddClient(this);
     }
 
-    /// <summary>
-    /// Processes incoming protocol messages from the client
-    /// </summary>
     private void ProcessClientMessages()
     {
         while (_state.IsConnected)
         {
             try
             {
-                // Receive protocol message from client
                 var receivedMessage = _protocolHandler.ReceiveMessage(_clientSocket);
                 Console.WriteLine($"Recibido: {receivedMessage}");
-                
-                // Process the command (for now, just echo back)
+
                 ProcessCommand(receivedMessage);
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("Connection closed"))
             {
-                // Client disconnected gracefully
                 _state.MarkAsDisconnectedNaturally();
             }
             catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionAborted)
@@ -98,7 +81,6 @@ public class ClientHandler
             }
             catch (Exception ex) when (ex.Message.Contains("Software caused connection abort"))
             {
-                // Conexión abortada por cierre del servidor - esto es esperado, no es un error
                 _state.MarkAsDisconnectedNaturally();
             }
             catch (Exception ex)
@@ -109,22 +91,17 @@ public class ClientHandler
         }
     }
 
-    /// <summary>
-    /// Processes the received command and sends appropriate response
-    /// </summary>
-    /// <param name="message">The received protocol message</param>
     private void ProcessCommand(ProtocolMessage message)
     {
         try
         {
             switch (message.Command)
             {
-                case ProtocolConstants.CMD_CREATE_CLASS: 
+                case ProtocolConstants.CMD_CREATE_CLASS:
                     HandleCreateClass(message);
                     break;
 
                 default:
-                    // Echo por defecto
                     var echoResponse = new ProtocolMessage(
                         ProtocolConstants.HEADER_RESPONSE,
                         message.Command,
@@ -138,7 +115,7 @@ public class ClientHandler
         catch (Exception ex)
         {
             Console.WriteLine($"Error procesando comando: {ex.Message}");
-            
+
             try
             {
                 var errorMessage = new ProtocolMessage(
@@ -154,46 +131,38 @@ public class ClientHandler
             }
         }
     }
-    
-    /// <summary>
-    /// Processes the ClassSession creation (CR2)
-    /// </summary>
+
     private void HandleCreateClass(ProtocolMessage message)
     {
-        // Data esperada: nombre|descripcion|cupos|max|fecha|duracion|imagenBase64
+        // Expected data: name|description|maxSeats|startDateTime|duration|imageBase64
         var parts = message.Data.Split('|');
-        string nombre = parts[0];
-        string descripcion = parts[1];
-        int cupos = int.Parse(parts[2]);
-        DateTime fecha = DateTime.Parse(parts[3]);
-        int duracion = int.Parse(parts[4]);
-        string? imagenBase64 = parts.Length > 5 ? parts[5] : null;
+        string name = parts[0];
+        string description = parts[1];
+        int maxSeats = int.Parse(parts[2]);
+        DateTime startDateTime = DateTime.Parse(parts[3]);
+        int durationMinutes = int.Parse(parts[4]);
+        string? imageBase64 = parts.Length > 5 ? parts[5] : null;
 
-        string? imagenPath = null;
-        if (!string.IsNullOrEmpty(imagenBase64))
+        string? imagePath = null;
+        if (!string.IsNullOrEmpty(imageBase64))
         {
             Directory.CreateDirectory("Images");
-            imagenPath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
-            File.WriteAllBytes(imagenPath, Convert.FromBase64String(imagenBase64));
+            imagePath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
+            File.WriteAllBytes(imagePath, Convert.FromBase64String(imageBase64));
         }
 
-        var clase = _classManager.CreateClass(nombre, descripcion, cupos, fecha, duracion, imagenPath);
+        var createdClass = _classService.CreateClass(name, description, maxSeats, startDateTime, durationMinutes, imagePath);
 
         var response = new ProtocolMessage(
             ProtocolConstants.HEADER_RESPONSE,
             ProtocolConstants.CMD_CREATE_CLASS,
-            $"OK|{clase.Id}|{clase.Link}"
+            $"OK|{createdClass.Id}|{createdClass.Link}"
         );
 
         _protocolHandler.SendMessage(_clientSocket, response);
-        Console.WriteLine($"Clase creada: {clase.Id} ({clase.Nombre})");
+        Console.WriteLine($"Clase creada: {createdClass.Id} ({createdClass.Name})");
     }
 
-
-    /// <summary>
-    /// Handles socket exceptions
-    /// </summary>
-    /// <param name="ex">The socket exception</param>
     private void HandleSocketException(SocketException ex)
     {
         if (_state.ShouldShowDisconnectMessages())
@@ -202,9 +171,6 @@ public class ClientHandler
         }
     }
 
-    /// <summary>
-    /// Handles object disposed exceptions
-    /// </summary>
     private void HandleObjectDisposedException()
     {
         if (_state.ShouldShowDisconnectMessages())
@@ -213,45 +179,32 @@ public class ClientHandler
         }
     }
 
-    /// <summary>
-    /// Handles generic exceptions
-    /// </summary>
-    /// <param name="ex">The exception</param>
     private void HandleGenericException(Exception ex)
     {
         Console.WriteLine($"Error manejando cliente: {ex.Message}");
     }
 
-    /// <summary>
-    /// Cleans up the client connection
-    /// </summary>
     private void CleanupClient()
     {
         _clientManager.RemoveClient(this);
-        
+
         if (_state.IsConnected)
         {
             DisconnectClient();
         }
     }
 
-    /// <summary>
-    /// Disconnects the client cleanly
-    /// </summary>
     public void DisconnectClient()
     {
         if (!_state.IsConnected)
         {
-            return; // Already disconnected
+            return;
         }
-        
+
         _state.MarkAsDisconnectedByServer();
         CloseSocket();
     }
 
-    /// <summary>
-    /// Closes the client socket
-    /// </summary>
     private void CloseSocket()
     {
         try

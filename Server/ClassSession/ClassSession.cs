@@ -3,12 +3,12 @@ namespace Server.ClassSession;
 public class ClassSession
 {
     public int Id { get; set; }
-    public string Nombre { get; set; }
-    public string Descripcion { get; set; }
-    public int CuposMaximos { get; set; }
-    public DateTime FechaHoraInicio { get; set; }
-    public int DuracionMinutos { get; set; }
-    public string? ImagenPath { get; set; }
-    public string Link { get; set; }
-    public List<string> Inscriptos { get; set; } = new List<string>();
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int MaxSeats { get; set; }
+    public DateTime StartDateTime { get; set; }
+    public int DurationMinutes { get; set; }
+    public string? ImagePath { get; set; }
+    public string Link { get; set; } = string.Empty;
+    public List<string> EnrolledUsers { get; set; } = new List<string>();
 }

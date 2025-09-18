@@ -31,35 +31,35 @@ public class ClientApplication
             Console.WriteLine("¡Conectado al servidor!");
             _isRunning = true;
 
-            // Thread para recibir mensajes del servidor
+            // Start thread to receive messages from server
             var receiveThread = new Thread(ReceiveMessages);
             receiveThread.IsBackground = true;
             receiveThread.Start();
 
-            // Loop principal con menú
+            // Main loop with menu
             while (_isRunning)
             {
-                MostrarMenu();
+                ShowMenu();
 
-                string? opcion = Console.ReadLine();
-                if (string.IsNullOrEmpty(opcion))
+                string? option = Console.ReadLine();
+                if (string.IsNullOrEmpty(option))
                     continue;
 
-                switch (opcion)
+                switch (option)
                 {
                     case "1":
-                        CrearClase();
+                        CreateClass();
                         break;
 
                     case "2":
-                        // Provisorio: mandar mensaje libre (para testear)
+                        // Temporary: send free message (for testing)
                         Console.Write("Mensaje: ");
                         string? message = Console.ReadLine();
                         if (!string.IsNullOrEmpty(message))
                         {
                             var protocolMessage = new ProtocolMessage(
                                 ProtocolConstants.HEADER_REQUEST,
-                                ProtocolConstants.CMD_LOGIN, // Provisorio
+                                ProtocolConstants.CMD_LOGIN, // Temporary
                                 message
                             );
                             _socketService.SendMessage(protocolMessage);
@@ -86,7 +86,7 @@ public class ClientApplication
         }
     }
 
-    private void MostrarMenu()
+    private void ShowMenu()
     {
         Console.WriteLine();
         Console.WriteLine("===== MENÚ CLIENTE =====");
@@ -97,40 +97,40 @@ public class ClientApplication
     }
 
     /// <summary>
-    /// Solicita datos al usuario y envía un request CMD_CREATE_CLASS
+    /// Asks user for class data and sends CMD_CREATE_CLASS request
     /// </summary>
-    private void CrearClase()
+    private void CreateClass()
     {
         Console.Write("Nombre: ");
-        string nombre = Console.ReadLine() ?? "";
+        string name = Console.ReadLine() ?? "";
 
         Console.Write("Descripción: ");
-        string descripcion = Console.ReadLine() ?? "";
+        string description = Console.ReadLine() ?? "";
 
         Console.Write("Cupos máximos: ");
-        int cupos = int.TryParse(Console.ReadLine(), out var c) ? c : 0;
+        int maxSeats = int.TryParse(Console.ReadLine(), out var c) ? c : 0;
 
         Console.Write("Duración (minutos): ");
-        int duracion = int.TryParse(Console.ReadLine(), out var d) ? d : 0;
+        int duration = int.TryParse(Console.ReadLine(), out var d) ? d : 0;
 
         Console.Write("Fecha y hora (yyyy-MM-dd HH:mm) o vacío para ahora: ");
-        string inputFecha = Console.ReadLine() ?? "";
-        DateTime fecha = string.IsNullOrEmpty(inputFecha) ? DateTime.Now : DateTime.Parse(inputFecha);
+        string inputDate = Console.ReadLine() ?? "";
+        DateTime startDateTime = string.IsNullOrEmpty(inputDate) ? DateTime.Now : DateTime.Parse(inputDate);
 
         Console.Write("Ruta imagen (opcional): ");
-        string rutaImagen = Console.ReadLine() ?? "";
-        string imagenBase64 = "";
-        if (!string.IsNullOrEmpty(rutaImagen) && File.Exists(rutaImagen))
+        string imagePath = Console.ReadLine() ?? "";
+        string imageBase64 = "";
+        if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
         {
-            imagenBase64 = Convert.ToBase64String(File.ReadAllBytes(rutaImagen));
+            imageBase64 = Convert.ToBase64String(File.ReadAllBytes(imagePath));
         }
 
-        string datos = $"{nombre}|{descripcion}|{cupos}|{fecha:yyyy-MM-dd HH:mm}|{duracion}|{imagenBase64}";
+        string data = $"{name}|{description}|{maxSeats}|{startDateTime:yyyy-MM-dd HH:mm}|{duration}|{imageBase64}";
 
         var request = new ProtocolMessage(
             ProtocolConstants.HEADER_REQUEST,
-            ProtocolConstants.CMD_CREATE_CLASS,  
-            datos
+            ProtocolConstants.CMD_CREATE_CLASS,
+            data
         );
 
         _socketService.SendMessage(request);
@@ -144,7 +144,7 @@ public class ClientApplication
             while (_isRunning)
             {
                 ProtocolMessage? message = _socketService.ReceiveMessage();
-                
+
                 if (message != null)
                 {
                     Console.WriteLine($"[Servidor] {message.Data}");
