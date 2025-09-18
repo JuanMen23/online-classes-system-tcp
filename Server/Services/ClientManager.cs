@@ -10,6 +10,11 @@ public class ClientManager
     private static readonly Lazy<ClientManager> _instance = new(() => new ClientManager());
     private readonly ConcurrentDictionary<Guid, ClientHandler> _connectedClients;
     private readonly object _lock = new object();
+    
+    // We use ConcurrentDictionary for Security on thread-safe environment
+    private readonly ConcurrentDictionary<string, User.User> _registeredUsers = new();
+    private readonly ConcurrentDictionary<Guid, string> _activeSessions = new(); // Clave: ClientHandler.Id, Valor: Username
+
 
     /// <summary>
     /// Gets the singleton instance of ClientManager
@@ -45,6 +50,7 @@ public class ClientManager
     {
         if (client != null)
         {
+            UserService.Instance.LogoutUser(client.Id);
             if (_connectedClients.TryRemove(client.Id, out _))
             {
                 Console.WriteLine($"Cliente desconectado. Total: {GetConnectedClientsCount()}");
@@ -103,5 +109,6 @@ public class ClientManager
     {
         return _connectedClients.Values.ToList();
     }
+
 }
 

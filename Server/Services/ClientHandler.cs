@@ -2,7 +2,6 @@ using System.Net.Sockets;
 using System.Text;
 using Common.Protocol;
 using Server.ClassSession;
-using Server.Services;
 
 namespace Server.Services;
 
@@ -15,6 +14,7 @@ public class ClientHandler
     private readonly ClientManager _clientManager;
     private readonly ClientState _state;
     private readonly ProtocolHandler _protocolHandler;
+    private readonly UserService _userService;
     private readonly ClassService _classService;
 
     public Guid Id { get; }
@@ -26,6 +26,7 @@ public class ClientHandler
         _state = new ClientState();
         _protocolHandler = new ProtocolHandler();
         _classService = ClassService.Instance;
+        _userService = UserService.Instance;
         Id = Guid.NewGuid();
     }
 
@@ -101,126 +102,121 @@ public class ClientHandler
                 case ProtocolConstants.CMD_CREATE_CLASS:
                     HandleCreateClass(message);
                     break;
-                
+
                 case ProtocolConstants.CMD_LIST_CLASSES:   // ✅ nuevo caso
                     HandleListClasses();
                     break;
+                    string responseData;
 
-                default:
-                    var echoResponse = new ProtocolMessage(
+                    switch (message.Command)
+                    {
+                        case ProtocolConstants.CMD_REGISTER:
+                            var partsReg = message.Data.Split('|');
+                            responseData = _userService.RegisterUser(partsReg[0], partsReg[1]);
+                            break;
+
+                        case ProtocolConstants.CMD_LOGIN:
+                            var partsLog = message.Data.Split('|');
+                            responseData = _userService.LoginUser(Id, partsLog[0], partsLog[1]);
+                            break;
+
+                        case ProtocolConstants.CMD_LOGOUT:
+                            _userService.LogoutUser(Id);
+                            responseData = ProtocolConstants.RESPONSE_OK;
+                            break;
+
+                        case ProtocolConstants.CMD_CREATE_CLASS:
+                            HandleCreateClass(message);
+                            return;
+
+                        default:
+                            responseData = "Comando desconocido";
+                            break;
+                    }
+
+                    var responseMessage = new ProtocolMessage(
                         ProtocolConstants.HEADER_RESPONSE,
                         message.Command,
-                        $"Echo: {message.Data}"
+                        responseData
                     );
-                    _protocolHandler.SendMessage(_clientSocket, echoResponse);
-                    Console.WriteLine($"Respuesta enviada: {echoResponse}");
-                    break;
+                    _protocolHandler.SendMessage(_clientSocket, responseMessage);
             }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error procesando comando: {ex.Message}");
-
-            try
-            {
-                var errorMessage = new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Internal server error"
-                );
-                _protocolHandler.SendMessage(_clientSocket, errorMessage);
-            }
-            catch
-            {
-                Console.WriteLine("Error al enviar respuesta de error");
-            }
-        }
-    }
-
-    private void HandleCreateClass(ProtocolMessage message)
-{
-    try
-    {
-        // Expected data: name|description|maxSeats|startDateTime|duration|imageBase64
-        var parts = message.Data.Split('|');
-
-        if (parts.Length < 5)
-        {
-            SendErrorResponse("Datos insuficientes para crear la clase");
-            return;
-        }
-
-        string name = parts[0];
-        string description = parts[1];
-
-        if (!int.TryParse(parts[2], out int maxSeats) || maxSeats <= 0)
-        {
-            SendErrorResponse("Número de cupos inválido");
-            return;
-        }
-
-        if (!DateTime.TryParse(parts[3], out DateTime startDateTime))
-        {
-            SendErrorResponse("Fecha inválida");
-            return;
-        }
-
-        if (!int.TryParse(parts[4], out int durationMinutes) || durationMinutes <= 0)
-        {
-            SendErrorResponse("Duración inválida");
-            return;
-        }
-
-        string? imageBase64 = parts.Length > 5 ? parts[5] : null;
-        string? imagePath = null;
-
-        if (!string.IsNullOrEmpty(imageBase64))
-        {
-            try
-            {
-                byte[] imageBytes = Convert.FromBase64String(imageBase64);
-
-                // Limit file size to 5 MB
-                if (imageBytes.Length > 5 * 1024 * 1024)
-                {
-                    SendErrorResponse("Imagen demasiado grande (máximo 5MB)");
-                    return;
-                }
-
-                Directory.CreateDirectory("Images");
-                imagePath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
-                File.WriteAllBytes(imagePath, imageBytes);
-            }
-            catch (FormatException)
-            {
-                SendErrorResponse("Formato de imagen Base64 inválido");
-                return;
-            }
-            catch (Exception ex)
-            {
-                SendErrorResponse($"Error guardando imagen: {ex.Message}");
-                return;
-            }
-        }
-
-        // Create class safely
-        var createdClass = _classService.CreateClass(name, description, maxSeats, startDateTime, durationMinutes, imagePath);
-
-        var response = new ProtocolMessage(
-            ProtocolConstants.HEADER_RESPONSE,
-            ProtocolConstants.CMD_CREATE_CLASS,
-            $"OK|{createdClass.Id}|{createdClass.Link}"
-        );
-
-        _protocolHandler.SendMessage(_clientSocket, response);
-        Console.WriteLine($"Clase creada: {createdClass.Id} ({createdClass.Name})");
-    }
-    catch (Exception ex)
+        }catch (Exception ex)
     {
         // Fallback general error
         SendErrorResponse($"Error inesperado: {ex.Message}");
     }
-}
+    }
+    private void HandleCreateClass(ProtocolMessage message)
+    {
+        if (!_userService.IsUserLoggedIn(Id))
+        {
+            SendErrorResponse("Acción no permitida. Debes iniciar sesión primero.");
+            return;
+        }
+
+        try
+        {
+            var parts = message.Data.Split('|');
+            if (parts.Length < 5) 
+            {
+                SendErrorResponse("Datos insuficientes para crear la clase");
+                return;
+            }
+            
+            var name = parts[0];
+            var description = parts[1];
+            
+            if (!int.TryParse(parts[2], out var maxSeats) || maxSeats <= 0)
+            {
+                SendErrorResponse("Número de cupos inválido");
+                return;
+            }
+            if (!DateTime.TryParse(parts[3], out var startDateTime))
+            {
+                SendErrorResponse("Fecha inválida");
+                return;
+            }
+            if (!int.TryParse(parts[4], out var durationMinutes) || durationMinutes <= 0)
+            {
+                SendErrorResponse("Duración inválida");
+                return;
+            }
+
+            var imageBase64 = parts.Length > 5 ? parts[5] : null;
+            
+            var createdClass = _classService.CreateClassWithDetails(
+                name, description, maxSeats, startDateTime, durationMinutes, imageBase64
+            );
+            
+            var response = new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_CREATE_CLASS,
+                $"OK|{createdClass.Id}|{createdClass.Link}"
+            );
+            _protocolHandler.SendMessage(_clientSocket, response);
+        }
+        catch (ArgumentException ex)
+        {
+            SendErrorResponse(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            SendErrorResponse($"Error inesperado: {ex.Message}");
+        }
+    }
+
+    private void SendErrorResponse(string errorMessage)
+    {
+        var errorResponse = new ProtocolMessage(
+            ProtocolConstants.HEADER_RESPONSE,
+            ProtocolConstants.CMD_ERROR,
+            errorMessage
+        );
+        _protocolHandler.SendMessage(_clientSocket, errorResponse);
+        Console.WriteLine($"[ERROR] {errorMessage}");
+    }
+    
     private void HandleListClasses()
     {
         var classes = _classService.GetAllClasses();
