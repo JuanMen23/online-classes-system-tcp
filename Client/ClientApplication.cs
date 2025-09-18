@@ -65,6 +65,9 @@ public class ClientApplication
                             _socketService.SendMessage(protocolMessage);
                         }
                         break;
+                    case "3":
+                        RequestClassList();
+                        break;
 
                     case "0":
                         _isRunning = false;
@@ -92,6 +95,7 @@ public class ClientApplication
         Console.WriteLine("===== MENÚ CLIENTE =====");
         Console.WriteLine("1. Crear clase");
         Console.WriteLine("2. Enviar mensaje (prueba)");
+        Console.WriteLine("3. Ver clases disponibles");
         Console.WriteLine("0. Salir");
         Console.Write("Seleccione una opción: ");
     }
@@ -100,88 +104,100 @@ public class ClientApplication
     /// Asks user for class data and sends CMD_CREATE_CLASS request
     /// </summary>
     private void CreateClass()
-{
-    Console.Write("Nombre: ");
-    string name = Console.ReadLine() ?? "";
-
-    Console.Write("Descripción: ");
-    string description = Console.ReadLine() ?? "";
-
-    // Cupos
-    int maxSeats;
-    while (true)
     {
-        Console.Write("Cupos máximos: ");
-        string input = Console.ReadLine() ?? "";
-        if (int.TryParse(input, out maxSeats) && maxSeats > 0)
-            break;
-        Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
-    }
+        Console.Write("Nombre: ");
+        string name = Console.ReadLine() ?? "";
 
-    // Duración
-    int duration;
-    while (true)
-    {
-        Console.Write("Duración (minutos): ");
-        string input = Console.ReadLine() ?? "";
-        if (int.TryParse(input, out duration) && duration > 0)
-            break;
-        Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
-    }
+        Console.Write("Descripción: ");
+        string description = Console.ReadLine() ?? "";
 
-    // Fecha
-    DateTime startDateTime;
-    while (true)
-    {
-        Console.Write("Fecha y hora (yyyy-MM-dd HH:mm) o vacío para ahora: ");
-        string input = Console.ReadLine() ?? "";
-        if (string.IsNullOrEmpty(input))
+        // Cupos
+        int maxSeats;
+        while (true)
         {
-            startDateTime = DateTime.Now;
-            break;
+            Console.Write("Cupos máximos: ");
+            string input = Console.ReadLine() ?? "";
+            if (int.TryParse(input, out maxSeats) && maxSeats > 0)
+                break;
+            Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
         }
-        if (DateTime.TryParse(input, out startDateTime))
-            break;
 
-        Console.WriteLine("⚠️ Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
-    }
-
-    // Imagen
-    Console.Write("Ruta imagen (opcional): ");
-    string imagePath = Console.ReadLine() ?? "";
-    string imageBase64 = "";
-    if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
-    {
-        try
+        // Duración
+        int duration;
+        while (true)
         {
-            byte[] bytes = File.ReadAllBytes(imagePath);
+            Console.Write("Duración (minutos): ");
+            string input = Console.ReadLine() ?? "";
+            if (int.TryParse(input, out duration) && duration > 0)
+                break;
+            Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
+        }
 
-            if (bytes.Length > 5 * 1024 * 1024)
+        // Fecha
+        DateTime startDateTime;
+        while (true)
+        {
+            Console.Write("Fecha y hora (yyyy-MM-dd HH:mm) o vacío para ahora: ");
+            string input = Console.ReadLine() ?? "";
+            if (string.IsNullOrEmpty(input))
             {
-                Console.WriteLine("⚠️ Imagen demasiado grande (máximo 5MB). No se enviará.");
+                startDateTime = DateTime.Now;
+                break;
             }
-            else
-            {
-                imageBase64 = Convert.ToBase64String(bytes);
-            }
+            if (DateTime.TryParse(input, out startDateTime))
+                break;
+
+            Console.WriteLine("⚠️ Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
         }
-        catch (Exception ex)
+
+        // Imagen
+        Console.Write("Ruta imagen (opcional): ");
+        string imagePath = Console.ReadLine() ?? "";
+        string imageBase64 = "";
+        if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
         {
-            Console.WriteLine($"⚠️ Error leyendo la imagen: {ex.Message}");
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(imagePath);
+
+                if (bytes.Length > 5 * 1024 * 1024)
+                {
+                    Console.WriteLine("⚠️ Imagen demasiado grande (máximo 5MB). No se enviará.");
+                }
+                else
+                {
+                    imageBase64 = Convert.ToBase64String(bytes);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Error leyendo la imagen: {ex.Message}");
+            }
         }
-    }
 
-    string data = $"{name}|{description}|{maxSeats}|{startDateTime:yyyy-MM-dd HH:mm}|{duration}|{imageBase64}";
+        string data = $"{name}|{description}|{maxSeats}|{startDateTime:yyyy-MM-dd HH:mm}|{duration}|{imageBase64}";
 
-    var request = new ProtocolMessage(
-        ProtocolConstants.HEADER_REQUEST,
-        ProtocolConstants.CMD_CREATE_CLASS,
-        data
-    );
+        var request = new ProtocolMessage(
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_CREATE_CLASS,
+            data
+        );
 
     _socketService.SendMessage(request);
     Console.WriteLine("Solicitud de creación de clase enviada.");
 }
+    
+    private void RequestClassList()
+    {
+        var request = new ProtocolMessage(
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_LIST_CLASSES,
+            "" // no necesitamos data
+        );
+
+        _socketService.SendMessage(request);
+        Console.WriteLine("Solicitud de listado de clases enviada.");
+    }
 
     private void ReceiveMessages()
     {
@@ -200,6 +216,19 @@ public class ClientApplication
                     Console.WriteLine("Servidor desconectado");
                     _isRunning = false;
                     break;
+                }
+                if (message.Command == ProtocolConstants.CMD_LIST_CLASSES)
+                {
+                    Console.WriteLine("===== Clases disponibles =====");
+                    Console.WriteLine(message.Data);
+                }
+                else if (message.Command == ProtocolConstants.CMD_ERROR)
+                {
+                    Console.WriteLine($"⚠️ Error: {message.Data}");
+                }
+                else
+                {
+                    Console.WriteLine($"[Servidor] {message.Data}");
                 }
             }
         }

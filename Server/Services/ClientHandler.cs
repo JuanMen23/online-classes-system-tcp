@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using System.Text;
 using Common.Protocol;
 using Server.ClassSession;
 using Server.Services;
@@ -99,6 +100,10 @@ public class ClientHandler
             {
                 case ProtocolConstants.CMD_CREATE_CLASS:
                     HandleCreateClass(message);
+                    break;
+                
+                case ProtocolConstants.CMD_LIST_CLASSES:   // ✅ nuevo caso
+                    HandleListClasses();
                     break;
 
                 default:
@@ -216,6 +221,30 @@ public class ClientHandler
         SendErrorResponse($"Error inesperado: {ex.Message}");
     }
 }
+    private void HandleListClasses()
+    {
+        var classes = _classService.GetAllClasses();
+
+        // Armar un string con los datos de todas las clases
+        var sb = new StringBuilder();
+        foreach (var c in classes)
+        {
+            string hasImage = string.IsNullOrEmpty(c.ImagePath) ? "No" : "Sí";
+            int enrolled = c.EnrolledUsers.Count;
+
+            sb.AppendLine($"{c.Id} | {c.Name} | {c.Description} | " +
+                          $"{c.StartDateTime:yyyy-MM-dd HH:mm} | {c.DurationMinutes} min | " +
+                          $"Cupos: {enrolled}/{c.MaxSeats} | Imagen: {hasImage}");
+        }
+
+        var response = new ProtocolMessage(
+            ProtocolConstants.HEADER_RESPONSE,
+            ProtocolConstants.CMD_LIST_CLASSES,
+            sb.ToString()
+        );
+
+        _protocolHandler.SendMessage(_clientSocket, response);
+    }
 
 private void SendErrorResponse(string errorMessage)
 {
