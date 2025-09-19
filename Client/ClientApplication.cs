@@ -52,7 +52,6 @@ public class ClientApplication
                         Thread.Sleep(100);
                         continue;
                     }
-                    Console.WriteLine();
                     
                     if (!_isLoggedIn)
                     {
