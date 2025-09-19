@@ -49,6 +49,21 @@ public class ClientApplication
                 {
                     Thread.Sleep(100);
                     continue;
+                    if (_waitingForServerResponse)
+                    {
+                        Thread.Sleep(100);
+                        continue;
+                    }
+                    
+                    if (!_isLoggedIn)
+                    {
+                        ShowLoggedOutMenu();
+                    }
+                    else
+                    {
+                        ShowLoggedInMenu();
+                    }
+                    
                 }
 
                 Console.WriteLine();
