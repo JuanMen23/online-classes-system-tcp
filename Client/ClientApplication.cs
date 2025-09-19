@@ -12,9 +12,9 @@ public class ClientApplication
     private readonly AppConfig _config;
     private readonly SocketService _socketService;
     private bool _isRunning;
-    
+
     private volatile bool _waitingForServerResponse = false;
-    
+
     // For user's session handling
     private bool _isLoggedIn = false;
     private string? _currentUser = null;
@@ -42,60 +42,24 @@ public class ClientApplication
             receiveThread.IsBackground = true;
             receiveThread.Start();
 
-            // Main loop with menu
+            // Main loop
             while (_isRunning)
             {
-                try
+                if (_waitingForServerResponse)
                 {
-                    case "1":
-                        CreateClass();
-                        break;
-
-                    case "2":
-                        // Temporary: send free message (for testing)
-                        Console.Write("Mensaje: ");
-                        string? message = Console.ReadLine();
-                        if (!string.IsNullOrEmpty(message))
-                        {
-                            var protocolMessage = new ProtocolMessage(
-                                ProtocolConstants.HEADER_REQUEST,
-                                ProtocolConstants.CMD_LOGIN, // Temporary
-                                message
-                            );
-                            _socketService.SendMessage(protocolMessage);
-                        }
-                        break;
-                    case "3":
-                        RequestClassList();
-                        break;
-
-                    case "0":
-                        _isRunning = false;
-                        break;
-
-                    default:
-                        Console.WriteLine("Opción inválida");
-                        break;
-                    if (_waitingForServerResponse)
-                    {
-                        Thread.Sleep(100);
-                        continue;
-                    }
-                    Console.WriteLine();
-                    
-                    if (!_isLoggedIn)
-                    {
-                        ShowLoggedOutMenu();
-                    }
-                    else
-                    {
-                        ShowLoggedInMenu();
-                    }
-                    
+                    Thread.Sleep(100);
+                    continue;
                 }
-                catch (Exception ex)
+
+                Console.WriteLine();
+
+                if (!_isLoggedIn)
                 {
-                    Console.WriteLine($"Error leyendo entrada: {ex.Message}");
+                    ShowLoggedOutMenu();
+                }
+                else
+                {
+                    ShowLoggedInMenu();
                 }
             }
         }
@@ -109,18 +73,62 @@ public class ClientApplication
         }
     }
 
-    private void ShowMenu()
+    // ===================== MENÚS =====================
+
+    /// <summary>
+    /// Menu when no user is logged
+    /// </summary>
+    private void ShowLoggedOutMenu()
     {
-        Console.WriteLine();
-        Console.WriteLine("===== MENÚ CLIENTE =====");
-        Console.WriteLine("1. Crear clase");
-        Console.WriteLine("2. Enviar mensaje (prueba)");
-        Console.WriteLine("3. Ver clases disponibles");
-        Console.WriteLine("0. Salir");
-        Console.Write("Seleccione una opción: ");
+        Console.WriteLine("--- Menú ---");
+        Console.WriteLine("1. Registrarse");
+        Console.WriteLine("2. Iniciar Sesión");
+        Console.WriteLine("3. Salir");
+        Console.Write("> ");
+        string? choice = Console.ReadLine();
+
+        switch (choice)
+        {
+            case "1": HandleRegister(); break;
+            case "2": HandleLogin(); break;
+            case "3": _isRunning = false; break;
+            default: Console.WriteLine("Opción no válida."); break;
+        }
     }
 
-    
+    /// <summary>
+    /// Menu for logged in user
+    /// </summary>
+    private void ShowLoggedInMenu()
+    {
+        Console.WriteLine($"--- Conectado como: {_currentUser} ---");
+        Console.WriteLine("1. Crear clase");
+        Console.WriteLine("2. Ver clases disponibles");
+        Console.WriteLine("3. Cerrar Sesión (Logout)");
+        Console.Write("\n > Seleccione una opción: ");
+
+        string? choice = Console.ReadLine();
+        if (string.IsNullOrEmpty(choice)) return;
+
+        switch (choice)
+        {
+            case "1":
+                CreateClass();
+                break;
+            case "2":
+                RequestClassList();
+                break;
+            case "3":
+                HandleLogout();
+                break;
+            default:
+                Console.WriteLine("Opción no válida.");
+                break;
+        }
+    }
+
+    // ===================== FUNCIONALIDADES =====================
+
     /// <summary>
     /// Asks user for class data and sends CMD_CREATE_CLASS request
     /// </summary>
@@ -204,10 +212,10 @@ public class ClientApplication
             data
         );
 
-    _socketService.SendMessage(request);
-    Console.WriteLine("Solicitud de creación de clase enviada.");
-}
-    
+        _socketService.SendMessage(request);
+        Console.WriteLine("Solicitud de creación de clase enviada.");
+    }
+
     private void RequestClassList()
     {
         var request = new ProtocolMessage(
@@ -220,9 +228,8 @@ public class ClientApplication
         Console.WriteLine("Solicitud de listado de clases enviada.");
     }
 
-    /// <summary>
-    /// Receives messages from the server in a separate thread
-    /// </summary>
+    // ===================== RECEPCIÓN DE MENSAJES =====================
+
     private void ReceiveMessages()
     {
         try
@@ -230,42 +237,30 @@ public class ClientApplication
             while (_isRunning)
             {
                 ProtocolMessage? response = _socketService.ReceiveMessage();
-                
+
                 if (response == null)
                 {
                     Console.WriteLine("Servidor desconectado");
                     _isRunning = false;
                     break;
                 }
-                if (message.Command == ProtocolConstants.CMD_LIST_CLASSES)
-                {
-                    Console.WriteLine("===== Clases disponibles =====");
-                    Console.WriteLine(message.Data);
-                }
-                else if (message.Command == ProtocolConstants.CMD_ERROR)
-                {
-                    Console.WriteLine($"⚠️ Error: {message.Data}");
-                }
-                else
-                {
-                    Console.WriteLine($"[Servidor] {message.Data}");
-                
-                switch(response.Command)
+
+                switch (response.Command)
                 {
                     case ProtocolConstants.CMD_REGISTER:
-                        if(response.Data == ProtocolConstants.RESPONSE_OK)
+                        if (response.Data == ProtocolConstants.RESPONSE_OK)
                             Console.WriteLine("\n-> ¡Registro exitoso! Ahora puedes iniciar sesión.");
                         else
                             Console.WriteLine($"\n-> Error de registro: {response.Data}");
                         break;
 
                     case ProtocolConstants.CMD_LOGIN:
-                        if(response.Data == ProtocolConstants.RESPONSE_OK)
+                        if (response.Data == ProtocolConstants.RESPONSE_OK)
                         {
                             _isLoggedIn = true;
                             Console.WriteLine($"\n-> ¡Bienvenido, {_currentUser}!");
                         }
-                        else 
+                        else
                         {
                             _currentUser = null;
                             Console.WriteLine($"\n-> Error de inicio de sesión: {response.Data}");
@@ -277,12 +272,21 @@ public class ClientApplication
                         _currentUser = null;
                         Console.WriteLine("\n-> Sesión cerrada correctamente.");
                         break;
-                    
+
+                    case ProtocolConstants.CMD_LIST_CLASSES:
+                        Console.WriteLine("===== Clases disponibles =====");
+                        Console.WriteLine(response.Data);
+                        break;
+
+                    case ProtocolConstants.CMD_ERROR:
+                        Console.WriteLine($"⚠️ Error: {response.Data}");
+                        break;
+
                     default:
                         Console.WriteLine($"Respuesta del servidor (CMD {response.Command}): {response.Data}");
                         break;
                 }
-                
+
                 _waitingForServerResponse = false;
                 if (_isRunning)
                 {
@@ -290,69 +294,18 @@ public class ClientApplication
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             if (_isRunning)
             {
                 Console.WriteLine("\nSe perdió la conexión con el servidor. Presione ENTER para salir.");
-                _isRunning = false; // Stop the application
+                _isRunning = false;
             }
         }
     }
-    
-    /// <summary>
-    /// Menu when no user is logged
-    /// </summary>
-    private void ShowLoggedOutMenu()
-    {
-        Console.WriteLine("--- Menú ---");
-        Console.WriteLine("1. Registrarse");
-        Console.WriteLine("2. Iniciar Sesión");
-        Console.WriteLine("3. Salir");
-        Console.Write("> ");
-        string? choice = Console.ReadLine();
 
-        switch (choice?.ToLower())
-        {
-            case "1": HandleRegister(); break;
-            case "2": HandleLogin(); break;
-            case "3": _isRunning = false; break;
-            default: Console.WriteLine("Opción no válida."); break;
-        }
-    }
+    // ===================== AUTH =====================
 
-    /// <summary>
-    /// Menu for logged in user
-    /// </summary>
-    private void ShowLoggedInMenu()
-    {
-        Console.WriteLine($"--- Conectado como: {_currentUser} ---");
-        Console.WriteLine("1. Crear clase");
-        Console.WriteLine("2. Cerrar Sesión (Logout)");
-        Console.Write("\n > Seleccione una opción: ");
-        
-        string? choice = Console.ReadLine();
-        if (string.IsNullOrEmpty(choice)) return; 
-
-        switch (choice)
-        {
-            case "1":
-                CreateClass();
-                break;
-
-            case "2":
-                HandleLogout();
-                break;
-
-            default:
-                Console.WriteLine("Opción no válida.");
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Handles user registration
-    /// </summary>
     private void HandleRegister()
     {
         Console.Write("Ingrese nombre de usuario: ");
@@ -368,19 +321,16 @@ public class ClientApplication
 
         string data = $"{username}|{password}";
         var message = new ProtocolMessage(
-            ProtocolConstants.HEADER_REQUEST, 
-            ProtocolConstants.CMD_REGISTER, 
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_REGISTER,
             data
-            );
-        
+        );
+
         _waitingForServerResponse = true;
         _socketService.SendMessage(message);
         Console.WriteLine("Enviando datos de registro...");
     }
 
-    /// <summary>
-    /// Data's Login
-    /// </summary>
     private void HandleLogin()
     {
         Console.Write("Ingrese nombre de usuario: ");
@@ -393,35 +343,33 @@ public class ClientApplication
             Console.WriteLine("El usuario y la contraseña no pueden estar vacíos.");
             return;
         }
-        
+
         _currentUser = username;
         var data = $"{username}|{password}";
         var message = new ProtocolMessage(
-            ProtocolConstants.HEADER_REQUEST, 
-            ProtocolConstants.CMD_LOGIN, 
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_LOGIN,
             data
-            );
-        
-        _waitingForServerResponse = true; 
+        );
+
+        _waitingForServerResponse = true;
         _socketService.SendMessage(message);
         Console.WriteLine("Iniciando sesión...");
     }
 
-    /// <summary>
-    /// Data logged out
-    /// </summary>
     private void HandleLogout()
     {
         var message = new ProtocolMessage(
-            ProtocolConstants.HEADER_REQUEST, 
-            ProtocolConstants.CMD_LOGOUT, 
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_LOGOUT,
             ""
-            );
-        
+        );
+
         _waitingForServerResponse = true;
         _socketService.SendMessage(message);
     }
 
+    // ===================== OTROS =====================
 
     private void Disconnect()
     {
