@@ -122,7 +122,7 @@ public class ServerApplication
                 if (string.IsNullOrWhiteSpace(input))
                     continue;
                 
-                string command = input.Trim().ToLower();
+                string command = input.Trim().ToUpper();
                 
                 switch (command)
                 {
