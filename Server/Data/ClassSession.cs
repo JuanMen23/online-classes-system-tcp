@@ -1,4 +1,4 @@
-namespace Server.ClassSession;
+namespace Server.Data;
 
 public class ClassSession
 {
@@ -11,4 +11,5 @@ public class ClassSession
     public string? ImagePath { get; set; }
     public string Link { get; set; } = string.Empty;
     public List<string> EnrolledUsers { get; set; } = new List<string>();
+    public string CreatedBy { get; set; } = string.Empty;
 }

@@ -195,4 +195,59 @@ public class ClassController
             _menuManager.ShowError($"Error al cancelar la inscripción: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Handles class modification process
+    /// </summary>
+    /// <param name="socketService">Socket service for sending messages</param>
+    /// <param name="setWaitingForResponse">Callback to set waiting state</param>
+    public void ModifyClass(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        try
+        {
+            var (classId, name, description, maxSeats, duration, startDateTime, imagePath) = _menuManager.PromptClassModification();
+
+            if (string.IsNullOrEmpty(classId))
+            {
+                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                return;
+            }
+
+            if (!_inputValidator.ValidateClassData(name, description, maxSeats, duration))
+            {
+                _menuManager.ShowError("Datos de clase inválidos. Intente nuevamente.");
+                return;
+            }
+
+            string imageBase64 = "";
+            if (!string.IsNullOrEmpty(imagePath))
+            {
+                try
+                {
+                    imageBase64 = _inputValidator.ReadImageFile(imagePath);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _menuManager.ShowError(ex.Message);
+                    return;
+                }
+            }
+
+            var data = $"{classId}|{name}|{description}|{maxSeats}|{startDateTime:yyyy-MM-dd HH:mm}|{duration}|{imageBase64}";
+
+            var request = new ProtocolMessage(
+                ProtocolConstants.HEADER_REQUEST,
+                ProtocolConstants.CMD_MODIFY_CLASS,
+                data
+            );
+
+            setWaitingForResponse(true);
+            socketService.SendMessage(request);
+            _menuManager.ShowInfo("Solicitud de modificación de clase enviada.");
+        }
+        catch (Exception ex)
+        {
+            _menuManager.ShowError($"Error al modificar la clase: {ex.Message}");
+        }
+    }
 }

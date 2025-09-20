@@ -1,6 +1,6 @@
 namespace Server.Services;
 
-using Server.ClassSession;
+using Server.Data;
 using System.Collections.Concurrent;
 using System.Collections.Generic; 
 using System.Linq;
@@ -20,7 +20,7 @@ public class ClassService
     private ClassService() { }
 
     public ClassSession CreateClass(string name, string description, int maxSeats,
-        DateTime startDateTime, int durationMinutes, string? imagePath)
+        DateTime startDateTime, int durationMinutes, string? imagePath, string createdBy)
     {
         int id;
         lock (_lockNextId)
@@ -36,7 +36,8 @@ public class ClassService
             StartDateTime = startDateTime,
             DurationMinutes = durationMinutes,
             ImagePath = imagePath,
-            Link = $"class-{Guid.NewGuid()}"
+            Link = $"class-{Guid.NewGuid()}",
+            CreatedBy = createdBy
         };
 
         _classes.Add(newClass);
@@ -44,7 +45,7 @@ public class ClassService
     }
     
     public ClassSession CreateClassWithDetails(string name, string description, int maxSeats,
-        DateTime startDateTime, int durationMinutes, string? imageBase64)
+        DateTime startDateTime, int durationMinutes, string? imageBase64, string createdBy)
     {
         string? imagePath = null;
         if (!string.IsNullOrEmpty(imageBase64))
@@ -59,9 +60,9 @@ public class ClassService
             File.WriteAllBytes(imagePath, imageBytes);
         }
         
-        var createdClass = CreateClass(name, description, maxSeats, startDateTime, durationMinutes, imagePath);
+        var createdClass = CreateClass(name, description, maxSeats, startDateTime, durationMinutes, imagePath, createdBy);
         
-        Console.WriteLine($"Clase creada: {createdClass.Id} ({createdClass.Name})");
+        Console.WriteLine($"Clase creada: {createdClass.Id} ({createdClass.Name}) por {createdBy}");
         return createdClass;
     }
 
@@ -121,8 +122,19 @@ public class ClassService
 
             var imageBase64 = parts.Length > 5 ? parts[5] : null;
 
+            // Obtener el nombre de usuario actual
+            var username = UserService.Instance.GetLoggedInUsername(clientId);
+            if (string.IsNullOrEmpty(username))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se pudo obtener el usuario actual"
+                );
+            }
+
             var createdClass = CreateClassWithDetails(
-                name, description, maxSeats, startDateTime, durationMinutes, imageBase64
+                name, description, maxSeats, startDateTime, durationMinutes, imageBase64, username
             );
 
             return new ProtocolMessage(
@@ -334,6 +346,196 @@ public class ClassService
                 ProtocolConstants.HEADER_RESPONSE,
                 ProtocolConstants.CMD_CANCEL_ENROLL,
                 $"OK|Inscripción cancelada exitosamente en la clase '{targetClass.Name}'. El cupo queda disponible para otros usuarios."
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                $"Error inesperado: {ex.Message}"
+            );
+        }
+    }
+
+    public ProtocolMessage HandleModifyClass(string data, Guid clientId)
+    {
+        // Verificar autenticación
+        if (!UserService.Instance.IsUserLoggedIn(clientId))
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                "Acción no permitida. Debes iniciar sesión primero."
+            );
+        }
+
+        try
+        {
+            var parts = data.Split('|');
+            if (parts.Length < 6)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Datos insuficientes para modificar la clase"
+                );
+            }
+
+            // Parsear el ID de la clase
+            if (!int.TryParse(parts[0], out var classId))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "ID de clase inválido"
+                );
+            }
+
+            // Buscar la clase
+            var targetClass = _classes.FirstOrDefault(c => c.Id == classId);
+            if (targetClass == null)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Clase no encontrada"
+                );
+            }
+
+            // Obtener el nombre de usuario actual
+            var username = UserService.Instance.GetLoggedInUsername(clientId);
+            if (string.IsNullOrEmpty(username))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se pudo obtener el usuario actual"
+                );
+            }
+
+            // Verificar que el usuario sea el creador de la clase
+            if (targetClass.CreatedBy != username)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Solo el creador de la clase puede modificarla"
+                );
+            }
+
+            // Verificar que la clase no haya comenzado
+            if (targetClass.StartDateTime <= DateTime.Now)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se puede modificar una clase que ya ha comenzado"
+                );
+            }
+
+            // Parsear los nuevos datos
+            var newName = parts[1];
+            var newDescription = parts[2];
+
+            if (!int.TryParse(parts[3], out var newMaxSeats) || newMaxSeats <= 0)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Número de cupos inválido"
+                );
+            }
+
+            if (!DateTime.TryParse(parts[4], out var newStartDateTime))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Fecha inválida"
+                );
+            }
+
+            if (!int.TryParse(parts[5], out var newDurationMinutes) || newDurationMinutes <= 0)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Duración inválida"
+                );
+            }
+
+            // Verificar que el nuevo número de cupos no sea menor al número de usuarios inscritos
+            if (newMaxSeats < targetClass.EnrolledUsers.Count)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    $"No se puede reducir los cupos por debajo del número de usuarios inscritos ({targetClass.EnrolledUsers.Count})"
+                );
+            }
+
+            // Procesar imagen si se proporciona
+            var newImageBase64 = parts.Length > 6 ? parts[6] : null;
+            string? newImagePath = targetClass.ImagePath; // Mantener la imagen actual por defecto
+
+            if (!string.IsNullOrEmpty(newImageBase64))
+            {
+                try
+                {
+                    byte[] imageBytes = Convert.FromBase64String(newImageBase64);
+                    if (imageBytes.Length > 5 * 1024 * 1024)
+                    {
+                        return new ProtocolMessage(
+                            ProtocolConstants.HEADER_RESPONSE,
+                            ProtocolConstants.CMD_ERROR,
+                            "Imagen demasiado grande (máximo 5MB)"
+                        );
+                    }
+
+                    // Eliminar imagen anterior si existe
+                    if (!string.IsNullOrEmpty(targetClass.ImagePath) && File.Exists(targetClass.ImagePath))
+                    {
+                        File.Delete(targetClass.ImagePath);
+                    }
+
+                    // Guardar nueva imagen
+                    Directory.CreateDirectory("Images");
+                    newImagePath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
+                    File.WriteAllBytes(newImagePath, imageBytes);
+                }
+                catch (FormatException)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "Formato de imagen inválido"
+                    );
+                }
+            }
+
+            // Actualizar los datos de la clase
+            targetClass.Name = newName;
+            targetClass.Description = newDescription;
+            targetClass.MaxSeats = newMaxSeats;
+            targetClass.StartDateTime = newStartDateTime;
+            targetClass.DurationMinutes = newDurationMinutes;
+            targetClass.ImagePath = newImagePath;
+
+            Console.WriteLine($"Clase modificada: {targetClass.Id} ({targetClass.Name}) por {username}");
+
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_MODIFY_CLASS,
+                $"OK|Clase '{targetClass.Name}' modificada exitosamente"
+            );
+        }
+        catch (ArgumentException ex)
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                ex.Message
             );
         }
         catch (Exception ex)

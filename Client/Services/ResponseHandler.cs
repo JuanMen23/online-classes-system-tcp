@@ -43,6 +43,10 @@ public class ResponseHandler
                 HandleClassCreationResponse(response);
                 break;
 
+            case ProtocolConstants.CMD_MODIFY_CLASS:
+                HandleClassModificationResponse(response);
+                break;
+
             case ProtocolConstants.CMD_LIST_CLASSES:
                 HandleClassListResponse(response);
                 break;
@@ -134,6 +138,22 @@ public class ResponseHandler
         else
         {
             _menuManager.ShowError($"Error al crear clase: {response.Data}");
+        }
+    }
+
+    /// <summary>
+    /// Handles class modification response from server
+    /// </summary>
+    /// <param name="response">Class modification response message</param>
+    private void HandleClassModificationResponse(ProtocolMessage response)
+    {
+        if (response.Data.StartsWith("OK|"))
+        {
+            _menuManager.ShowSuccess(response.Data.Substring(3)); // Mostrar el mensaje después de "OK|"
+        }
+        else
+        {
+            _menuManager.ShowError($"Error al modificar clase: {response.Data}");
         }
     }
 

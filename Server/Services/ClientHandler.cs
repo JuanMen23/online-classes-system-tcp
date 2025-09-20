@@ -1,6 +1,6 @@
 using System.Net.Sockets;
 using Common.Protocol;
-using Server.ClassSession;
+using Server.Data;
 
 namespace Server.Services;
 
@@ -120,6 +120,11 @@ public class ClientHandler
                 case ProtocolConstants.CMD_CREATE_CLASS:
                     var createResponse = _classService.HandleCreateClass(message.Data, Id);
                     _protocolHandler.SendMessage(_clientSocket, createResponse);
+                    break;
+
+                case ProtocolConstants.CMD_MODIFY_CLASS:
+                    var modifyResponse = _classService.HandleModifyClass(message.Data, Id);
+                    _protocolHandler.SendMessage(_clientSocket, modifyResponse);
                     break;
 
                 case ProtocolConstants.CMD_LIST_CLASSES:

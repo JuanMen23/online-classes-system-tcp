@@ -25,10 +25,11 @@ public class MenuManager
     {
         Console.WriteLine($"--- Conectado como: {currentUser} ---");
         Console.WriteLine("1. Crear clase");
-        Console.WriteLine("2. Ver clases disponibles");
-        Console.WriteLine("3. Inscribirse en clase");
-        Console.WriteLine("4. Cancelar inscripción");
-        Console.WriteLine("5. Cerrar Sesión (Logout)");
+        Console.WriteLine("2. Modificar clase");
+        Console.WriteLine("3. Ver clases disponibles");
+        Console.WriteLine("4. Inscribirse en clase");
+        Console.WriteLine("5. Cancelar inscripción");
+        Console.WriteLine("6. Cerrar Sesión (Logout)");
         Console.Write("\n > Seleccione una opción: ");
     }
 
@@ -182,6 +183,64 @@ public class MenuManager
     {
         Console.Write("Ingrese el ID de la clase de la cual desea cancelar su inscripción: ");
         return Console.ReadLine() ?? "";
+    }
+
+    /// <summary>
+    /// Prompts for class modification data
+    /// </summary>
+    /// <returns>Class ID and modification data as tuple</returns>
+    public (string classId, string name, string description, int maxSeats, int duration, DateTime startDateTime, string imagePath) PromptClassModification()
+    {
+        Console.Write("Ingrese el ID de la clase que desea modificar: ");
+        string classId = Console.ReadLine() ?? "";
+
+        Console.WriteLine("Ingrese los nuevos datos para la clase:");
+        
+        Console.Write("Nombre: ");
+        string name = Console.ReadLine() ?? "";
+
+        Console.Write("Descripción: ");
+        string description = Console.ReadLine() ?? "";
+
+        // Cupos
+        int maxSeats;
+        while (true)
+        {
+            Console.Write("Cupos máximos: ");
+            string input = Console.ReadLine() ?? "";
+            if (int.TryParse(input, out maxSeats) && maxSeats > 0)
+                break;
+            Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
+        }
+
+        // Duración
+        int duration;
+        while (true)
+        {
+            Console.Write("Duración (minutos): ");
+            string input = Console.ReadLine() ?? "";
+            if (int.TryParse(input, out duration) && duration > 0)
+                break;
+            Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
+        }
+
+        // Fecha
+        DateTime startDateTime;
+        while (true)
+        {
+            Console.Write("Fecha y hora (yyyy-MM-dd HH:mm): ");
+            string input = Console.ReadLine() ?? "";
+            if (DateTime.TryParse(input, out startDateTime))
+                break;
+
+            Console.WriteLine("⚠️ Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
+        }
+
+        // Imagen
+        Console.Write("Ruta nueva imagen (opcional, dejar vacío para mantener la actual): ");
+        string imagePath = Console.ReadLine() ?? "";
+
+        return (classId, name, description, maxSeats, duration, startDateTime, imagePath);
     }
 
     /// <summary>
