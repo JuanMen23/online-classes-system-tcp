@@ -26,10 +26,11 @@ public class MenuManager
         Console.WriteLine($"--- Conectado como: {currentUser} ---");
         Console.WriteLine("1. Crear clase");
         Console.WriteLine("2. Modificar clase");
-        Console.WriteLine("3. Ver clases disponibles");
-        Console.WriteLine("4. Inscribirse en clase");
-        Console.WriteLine("5. Cancelar inscripción");
-        Console.WriteLine("6. Cerrar Sesión (Logout)");
+        Console.WriteLine("3. Eliminar clase");
+        Console.WriteLine("4. Ver clases disponibles");
+        Console.WriteLine("5. Inscribirse en clase");
+        Console.WriteLine("6. Cancelar inscripción");
+        Console.WriteLine("7. Cerrar Sesión (Logout)");
         Console.Write("\n > Seleccione una opción: ");
     }
 
@@ -241,6 +242,16 @@ public class MenuManager
         string imagePath = Console.ReadLine() ?? "";
 
         return (classId, name, description, maxSeats, duration, startDateTime, imagePath);
+    }
+
+    /// <summary>
+    /// Prompts for class deletion
+    /// </summary>
+    /// <returns>Class ID as string</returns>
+    public string PromptClassDeletion()
+    {
+        Console.Write("Ingrese el ID de la clase que desea eliminar: ");
+        return Console.ReadLine() ?? "";
     }
 
     /// <summary>

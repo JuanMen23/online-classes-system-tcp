@@ -250,4 +250,47 @@ public class ClassController
             _menuManager.ShowError($"Error al modificar la clase: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Handles class deletion process
+    /// </summary>
+    /// <param name="socketService">Socket service for sending messages</param>
+    /// <param name="setWaitingForResponse">Callback to set waiting state</param>
+    public void DeleteClass(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        try
+        {
+            var classId = _menuManager.PromptClassDeletion();
+
+            if (string.IsNullOrEmpty(classId))
+            {
+                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                return;
+            }
+
+            // Confirmar eliminación
+            Console.Write("¿Está seguro que desea eliminar esta clase? (s/N): ");
+            var confirmation = Console.ReadLine()?.ToLower();
+            
+            if (confirmation != "s" && confirmation != "sí" && confirmation != "si")
+            {
+                _menuManager.ShowInfo("Operación cancelada.");
+                return;
+            }
+
+            var request = new ProtocolMessage(
+                ProtocolConstants.HEADER_REQUEST,
+                ProtocolConstants.CMD_DELETE_CLASS,
+                classId
+            );
+
+            setWaitingForResponse(true);
+            socketService.SendMessage(request);
+            _menuManager.ShowInfo("Solicitud de eliminación de clase enviada.");
+        }
+        catch (Exception ex)
+        {
+            _menuManager.ShowError($"Error al eliminar la clase: {ex.Message}");
+        }
+    }
 }

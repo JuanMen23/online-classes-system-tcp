@@ -547,4 +547,129 @@ public class ClassService
             );
         }
     }
+
+    public ProtocolMessage HandleDeleteClass(string data, Guid clientId)
+    {
+        // Verificar autenticación
+        if (!UserService.Instance.IsUserLoggedIn(clientId))
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                "Acción no permitida. Debes iniciar sesión primero."
+            );
+        }
+
+        try
+        {
+            // Parsear el ID de la clase
+            if (!int.TryParse(data, out var classId))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "ID de clase inválido"
+                );
+            }
+
+            // Buscar la clase
+            var targetClass = _classes.FirstOrDefault(c => c.Id == classId);
+            if (targetClass == null)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Clase no encontrada"
+                );
+            }
+
+            // Obtener el nombre de usuario actual
+            var username = UserService.Instance.GetLoggedInUsername(clientId);
+            if (string.IsNullOrEmpty(username))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se pudo obtener el usuario actual"
+                );
+            }
+
+            // Verificar que el usuario sea el creador de la clase
+            if (targetClass.CreatedBy != username)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Solo el creador de la clase puede eliminarla"
+                );
+            }
+
+            // Verificar que no haya usuarios inscritos
+            if (targetClass.EnrolledUsers.Count > 0)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se puede eliminar una clase que tiene usuarios inscritos"
+                );
+            }
+
+            // Verificar que la clase no haya comenzado
+            if (targetClass.StartDateTime <= DateTime.Now)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se puede eliminar una clase que ya ha comenzado"
+                );
+            }
+
+            // Eliminar imagen asociada si existe
+            if (!string.IsNullOrEmpty(targetClass.ImagePath) && File.Exists(targetClass.ImagePath))
+            {
+                try
+                {
+                    File.Delete(targetClass.ImagePath);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Advertencia: No se pudo eliminar la imagen {targetClass.ImagePath}: {ex.Message}");
+                }
+            }
+
+            // Eliminar la clase de la colección
+            var classList = _classes.ToList();
+            var classToRemove = classList.FirstOrDefault(c => c.Id == classId);
+            if (classToRemove != null)
+            {
+                // Como ConcurrentBag no tiene Remove, necesitamos recrear la colección sin el elemento
+                var newClasses = classList.Where(c => c.Id != classId).ToList();
+                
+                // Limpiar la colección actual
+                while (_classes.TryTake(out _)) { }
+                
+                // Agregar todas las clases excepto la eliminada
+                foreach (var cls in newClasses)
+                {
+                    _classes.Add(cls);
+                }
+            }
+
+            Console.WriteLine($"Clase eliminada: {targetClass.Id} ({targetClass.Name}) por {username}");
+
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_DELETE_CLASS,
+                $"OK|Clase '{targetClass.Name}' eliminada exitosamente"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                $"Error inesperado: {ex.Message}"
+            );
+        }
+    }
 }

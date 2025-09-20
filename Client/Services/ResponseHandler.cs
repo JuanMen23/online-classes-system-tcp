@@ -47,6 +47,10 @@ public class ResponseHandler
                 HandleClassModificationResponse(response);
                 break;
 
+            case ProtocolConstants.CMD_DELETE_CLASS:
+                HandleClassDeletionResponse(response);
+                break;
+
             case ProtocolConstants.CMD_LIST_CLASSES:
                 HandleClassListResponse(response);
                 break;
@@ -154,6 +158,22 @@ public class ResponseHandler
         else
         {
             _menuManager.ShowError($"Error al modificar clase: {response.Data}");
+        }
+    }
+
+    /// <summary>
+    /// Handles class deletion response from server
+    /// </summary>
+    /// <param name="response">Class deletion response message</param>
+    private void HandleClassDeletionResponse(ProtocolMessage response)
+    {
+        if (response.Data.StartsWith("OK|"))
+        {
+            _menuManager.ShowSuccess(response.Data.Substring(3)); // Mostrar el mensaje después de "OK|"
+        }
+        else
+        {
+            _menuManager.ShowError($"Error al eliminar clase: {response.Data}");
         }
     }
 
