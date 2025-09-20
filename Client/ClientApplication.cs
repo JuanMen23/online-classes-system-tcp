@@ -12,9 +12,9 @@ public class ClientApplication
     private readonly AppConfig _config;
     private readonly SocketService _socketService;
     private bool _isRunning;
-    
+
     private volatile bool _waitingForServerResponse = false;
-    
+
     // For user's session handling
     private bool _isLoggedIn = false;
     private string? _currentUser = null;
@@ -42,11 +42,13 @@ public class ClientApplication
             receiveThread.IsBackground = true;
             receiveThread.Start();
 
-            // Main loop with menu
+            // Main loop
             while (_isRunning)
             {
-                try
+                if (_waitingForServerResponse)
                 {
+                    Thread.Sleep(100);
+                    continue;
                     if (_waitingForServerResponse)
                     {
                         Thread.Sleep(100);
@@ -63,9 +65,16 @@ public class ClientApplication
                     }
                     
                 }
-                catch (Exception ex)
+
+                Console.WriteLine();
+
+                if (!_isLoggedIn)
                 {
-                    Console.WriteLine($"Error leyendo entrada: {ex.Message}");
+                    ShowLoggedOutMenu();
+                }
+                else
+                {
+                    ShowLoggedInMenu();
                 }
             }
         }
@@ -78,162 +87,9 @@ public class ClientApplication
             Disconnect();
         }
     }
-    
-    /// <summary>
-    /// Asks user for class data and sends CMD_CREATE_CLASS request
-    /// </summary>
-    private void CreateClass()
-{
-    Console.Write("Nombre: ");
-    string name = Console.ReadLine() ?? "";
 
-    Console.Write("Descripción: ");
-    string description = Console.ReadLine() ?? "";
+    // ===================== MENÚS =====================
 
-    // Cupos
-    int maxSeats;
-    while (true)
-    {
-        Console.Write("Cupos máximos: ");
-        string input = Console.ReadLine() ?? "";
-        if (int.TryParse(input, out maxSeats) && maxSeats > 0)
-            break;
-        Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
-    }
-
-    // Duración
-    int duration;
-    while (true)
-    {
-        Console.Write("Duración (minutos): ");
-        string input = Console.ReadLine() ?? "";
-        if (int.TryParse(input, out duration) && duration > 0)
-            break;
-        Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
-    }
-
-    // Fecha
-    DateTime startDateTime;
-    while (true)
-    {
-        Console.Write("Fecha y hora (yyyy-MM-dd HH:mm) o vacío para ahora: ");
-        string input = Console.ReadLine() ?? "";
-        if (string.IsNullOrEmpty(input))
-        {
-            startDateTime = DateTime.Now;
-            break;
-        }
-        if (DateTime.TryParse(input, out startDateTime))
-            break;
-
-        Console.WriteLine("⚠️ Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
-    }
-
-    // Imagen
-    Console.Write("Ruta imagen (opcional): ");
-    string imagePath = Console.ReadLine() ?? "";
-    string imageBase64 = "";
-    if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
-    {
-        try
-        {
-            byte[] bytes = File.ReadAllBytes(imagePath);
-
-            if (bytes.Length > 5 * 1024 * 1024)
-            {
-                Console.WriteLine("⚠️ Imagen demasiado grande (máximo 5MB). No se enviará.");
-            }
-            else
-            {
-                imageBase64 = Convert.ToBase64String(bytes);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"⚠️ Error leyendo la imagen: {ex.Message}");
-        }
-    }
-
-    string data = $"{name}|{description}|{maxSeats}|{startDateTime:yyyy-MM-dd HH:mm}|{duration}|{imageBase64}";
-
-    var request = new ProtocolMessage(
-        ProtocolConstants.HEADER_REQUEST,
-        ProtocolConstants.CMD_CREATE_CLASS,
-        data
-    );
-
-    _socketService.SendMessage(request);
-    Console.WriteLine("Solicitud de creación de clase enviada.");
-}
-
-    /// <summary>
-    /// Receives messages from the server in a separate thread
-    /// </summary>
-    private void ReceiveMessages()
-    {
-        try
-        {
-            while (_isRunning)
-            {
-                ProtocolMessage? response = _socketService.ReceiveMessage();
-                
-                if (response == null)
-                {
-                    Console.WriteLine("Servidor desconectado");
-                    _isRunning = false;
-                    break;
-                }
-                
-                switch(response.Command)
-                {
-                    case ProtocolConstants.CMD_REGISTER:
-                        if(response.Data == ProtocolConstants.RESPONSE_OK)
-                            Console.WriteLine("\n-> ¡Registro exitoso! Ahora puedes iniciar sesión.");
-                        else
-                            Console.WriteLine($"\n-> Error de registro: {response.Data}");
-                        break;
-
-                    case ProtocolConstants.CMD_LOGIN:
-                        if(response.Data == ProtocolConstants.RESPONSE_OK)
-                        {
-                            _isLoggedIn = true;
-                            Console.WriteLine($"\n-> ¡Bienvenido, {_currentUser}!");
-                        }
-                        else 
-                        {
-                            _currentUser = null;
-                            Console.WriteLine($"\n-> Error de inicio de sesión: {response.Data}");
-                        }
-                        break;
-
-                    case ProtocolConstants.CMD_LOGOUT:
-                        _isLoggedIn = false;
-                        _currentUser = null;
-                        Console.WriteLine("\n-> Sesión cerrada correctamente.");
-                        break;
-                    
-                    default:
-                        Console.WriteLine($"Respuesta del servidor (CMD {response.Command}): {response.Data}");
-                        break;
-                }
-                
-                _waitingForServerResponse = false;
-                if (_isRunning)
-                {
-                    Console.Write("\n> ");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            if (_isRunning)
-            {
-                Console.WriteLine("\nSe perdió la conexión con el servidor. Presione ENTER para salir.");
-                _isRunning = false; // Stop the application
-            }
-        }
-    }
-    
     /// <summary>
     /// Menu when no user is logged
     /// </summary>
@@ -246,7 +102,7 @@ public class ClientApplication
         Console.Write("> ");
         string? choice = Console.ReadLine();
 
-        switch (choice?.ToLower())
+        switch (choice)
         {
             case "1": HandleRegister(); break;
             case "2": HandleLogin(); break;
@@ -262,31 +118,221 @@ public class ClientApplication
     {
         Console.WriteLine($"--- Conectado como: {_currentUser} ---");
         Console.WriteLine("1. Crear clase");
-        Console.WriteLine("2. Cerrar Sesión (Logout)");
+        Console.WriteLine("2. Ver clases disponibles");
+        Console.WriteLine("3. Cerrar Sesión (Logout)");
         Console.Write("\n > Seleccione una opción: ");
-        
+
         string? choice = Console.ReadLine();
-        if (string.IsNullOrEmpty(choice)) return; 
+        if (string.IsNullOrEmpty(choice)) return;
 
         switch (choice)
         {
             case "1":
                 CreateClass();
                 break;
-
             case "2":
+                RequestClassList();
+                break;
+            case "3":
                 HandleLogout();
                 break;
-
             default:
                 Console.WriteLine("Opción no válida.");
                 break;
         }
     }
 
+    // ===================== FUNCIONALIDADES =====================
+
     /// <summary>
-    /// Handles user registration
+    /// Asks user for class data and sends CMD_CREATE_CLASS request
     /// </summary>
+    private void CreateClass()
+    {
+        Console.Write("Nombre: ");
+        string name = Console.ReadLine() ?? "";
+
+        Console.Write("Descripción: ");
+        string description = Console.ReadLine() ?? "";
+
+        // Cupos
+        int maxSeats;
+        while (true)
+        {
+            Console.Write("Cupos máximos: ");
+            string input = Console.ReadLine() ?? "";
+            if (int.TryParse(input, out maxSeats) && maxSeats > 0)
+                break;
+            Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
+        }
+
+        // Duración
+        int duration;
+        while (true)
+        {
+            Console.Write("Duración (minutos): ");
+            string input = Console.ReadLine() ?? "";
+            if (int.TryParse(input, out duration) && duration > 0)
+                break;
+            Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
+        }
+
+        // Fecha
+        DateTime startDateTime;
+        while (true)
+        {
+            Console.Write("Fecha y hora (yyyy-MM-dd HH:mm) o vacío para ahora: ");
+            string input = Console.ReadLine() ?? "";
+            if (string.IsNullOrEmpty(input))
+            {
+                startDateTime = DateTime.Now;
+                break;
+            }
+            if (DateTime.TryParse(input, out startDateTime))
+                break;
+
+            Console.WriteLine("⚠️ Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
+        }
+
+        // Imagen
+        Console.Write("Ruta imagen (opcional): ");
+        string imagePath = Console.ReadLine() ?? "";
+        string imageBase64 = "";
+        if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
+        {
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(imagePath);
+
+                if (bytes.Length > 5 * 1024 * 1024)
+                {
+                    Console.WriteLine("⚠️ Imagen demasiado grande (máximo 5MB). No se enviará.");
+                }
+                else
+                {
+                    imageBase64 = Convert.ToBase64String(bytes);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Error leyendo la imagen: {ex.Message}");
+            }
+        }
+
+        string data = $"{name}|{description}|{maxSeats}|{startDateTime:yyyy-MM-dd HH:mm}|{duration}|{imageBase64}";
+
+        var request = new ProtocolMessage(
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_CREATE_CLASS,
+            data
+        );
+
+        _waitingForServerResponse = true;
+        _socketService.SendMessage(request);
+        Console.WriteLine("Solicitud de creación de clase enviada.");
+    }
+
+    private void RequestClassList()
+    {
+        var request = new ProtocolMessage(
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_LIST_CLASSES,
+            "" // no necesitamos data
+        );
+
+        _waitingForServerResponse = true;
+        _socketService.SendMessage(request);
+        Console.WriteLine("Solicitud de listado de clases enviada.");
+    }
+
+    // ===================== RECEPCIÓN DE MENSAJES =====================
+
+    private void ReceiveMessages()
+    {
+        try
+        {
+            while (_isRunning)
+            {
+                ProtocolMessage? response = _socketService.ReceiveMessage();
+
+                if (response == null)
+                {
+                    Console.WriteLine("Servidor desconectado");
+                    _isRunning = false;
+                    break;
+                }
+
+                switch (response.Command)
+                {
+                    case ProtocolConstants.CMD_REGISTER:
+                        if (response.Data == ProtocolConstants.RESPONSE_OK)
+                            Console.WriteLine("\n-> ¡Registro exitoso! Ahora puedes iniciar sesión.");
+                        else
+                            Console.WriteLine($"\n-> Error de registro: {response.Data}");
+                        break;
+
+                    case ProtocolConstants.CMD_LOGIN:
+                        if (response.Data == ProtocolConstants.RESPONSE_OK)
+                        {
+                            _isLoggedIn = true;
+                            Console.WriteLine($"\n-> ¡Bienvenido, {_currentUser}!");
+                        }
+                        else
+                        {
+                            _currentUser = null;
+                            Console.WriteLine($"\n-> Error de inicio de sesión: {response.Data}");
+                        }
+                        break;
+
+                    case ProtocolConstants.CMD_LOGOUT:
+                        _isLoggedIn = false;
+                        _currentUser = null;
+                        Console.WriteLine("\n-> Sesión cerrada correctamente.");
+                        break;
+
+                    case ProtocolConstants.CMD_CREATE_CLASS:
+                        if (response.Data.StartsWith("OK|"))
+                        {
+                            var parts = response.Data.Split('|');
+                            Console.WriteLine($"✅ ¡Clase creada exitosamente!");
+                            Console.WriteLine($"   ID: {parts[1]}");
+                            Console.WriteLine($"   Link: {parts[2]}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"⚠️ Error al crear clase: {response.Data}");
+                        }
+                        break;
+
+                    case ProtocolConstants.CMD_LIST_CLASSES:
+                        Console.WriteLine("===== Clases disponibles =====");
+                        Console.WriteLine(response.Data);
+                        break;
+
+                    case ProtocolConstants.CMD_ERROR:
+                        Console.WriteLine($"⚠️ Error: {response.Data}");
+                        break;
+
+                    default:
+                        Console.WriteLine($"Respuesta del servidor (CMD {response.Command}): {response.Data}");
+                        break;
+                }
+
+                _waitingForServerResponse = false;
+            }
+        }
+        catch (Exception)
+        {
+            if (_isRunning)
+            {
+                Console.WriteLine("\nSe perdió la conexión con el servidor. Presione ENTER para salir.");
+                _isRunning = false;
+            }
+        }
+    }
+
+    // ===================== AUTH =====================
+
     private void HandleRegister()
     {
         Console.Write("Ingrese nombre de usuario: ");
@@ -302,19 +348,16 @@ public class ClientApplication
 
         string data = $"{username}|{password}";
         var message = new ProtocolMessage(
-            ProtocolConstants.HEADER_REQUEST, 
-            ProtocolConstants.CMD_REGISTER, 
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_REGISTER,
             data
-            );
-        
+        );
+
         _waitingForServerResponse = true;
         _socketService.SendMessage(message);
         Console.WriteLine("Enviando datos de registro...");
     }
 
-    /// <summary>
-    /// Data's Login
-    /// </summary>
     private void HandleLogin()
     {
         Console.Write("Ingrese nombre de usuario: ");
@@ -327,35 +370,33 @@ public class ClientApplication
             Console.WriteLine("El usuario y la contraseña no pueden estar vacíos.");
             return;
         }
-        
+
         _currentUser = username;
         var data = $"{username}|{password}";
         var message = new ProtocolMessage(
-            ProtocolConstants.HEADER_REQUEST, 
-            ProtocolConstants.CMD_LOGIN, 
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_LOGIN,
             data
-            );
-        
-        _waitingForServerResponse = true; 
+        );
+
+        _waitingForServerResponse = true;
         _socketService.SendMessage(message);
         Console.WriteLine("Iniciando sesión...");
     }
 
-    /// <summary>
-    /// Data logged out
-    /// </summary>
     private void HandleLogout()
     {
         var message = new ProtocolMessage(
-            ProtocolConstants.HEADER_REQUEST, 
-            ProtocolConstants.CMD_LOGOUT, 
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_LOGOUT,
             ""
-            );
-        
+        );
+
         _waitingForServerResponse = true;
         _socketService.SendMessage(message);
     }
 
+    // ===================== OTROS =====================
 
     private void Disconnect()
     {
