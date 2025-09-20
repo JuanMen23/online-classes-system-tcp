@@ -26,7 +26,8 @@ public class MenuManager
         Console.WriteLine($"--- Conectado como: {currentUser} ---");
         Console.WriteLine("1. Crear clase");
         Console.WriteLine("2. Ver clases disponibles");
-        Console.WriteLine("3. Cerrar Sesión (Logout)");
+        Console.WriteLine("3. Inscribirse en clase");
+        Console.WriteLine("4. Cerrar Sesión (Logout)");
         Console.Write("\n > Seleccione una opción: ");
     }
 
@@ -160,6 +161,16 @@ public class MenuManager
     public void ShowConnectionStatus(string message)
     {
         Console.WriteLine(message);
+    }
+
+    /// <summary>
+    /// Prompts for class enrollment
+    /// </summary>
+    /// <returns>Class ID as string</returns>
+    public string PromptClassEnrollment()
+    {
+        Console.Write("Ingrese el ID de la clase a la que desea inscribirse: ");
+        return Console.ReadLine() ?? "";
     }
 
     /// <summary>

@@ -129,4 +129,37 @@ public class ClassController
     {
         return _inputValidator.FormatClassData(name, description, maxSeats, startDateTime, duration, imageBase64);
     }
+
+    /// <summary>
+    /// Handles class enrollment process
+    /// </summary>
+    /// <param name="socketService">Socket service for sending messages</param>
+    /// <param name="setWaitingForResponse">Callback to set waiting state</param>
+    public void EnrollInClass(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        try
+        {
+            var classId = _menuManager.PromptClassEnrollment();
+
+            if (string.IsNullOrEmpty(classId))
+            {
+                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                return;
+            }
+
+            var request = new ProtocolMessage(
+                ProtocolConstants.HEADER_REQUEST,
+                ProtocolConstants.CMD_ENROLL_CLASS,
+                classId
+            );
+
+            setWaitingForResponse(true);
+            socketService.SendMessage(request);
+            _menuManager.ShowInfo("Solicitud de inscripción enviada.");
+        }
+        catch (Exception ex)
+        {
+            _menuManager.ShowError($"Error al inscribirse en la clase: {ex.Message}");
+        }
+    }
 }

@@ -127,6 +127,11 @@ public class ClientHandler
                     _protocolHandler.SendMessage(_clientSocket, listResponse);
                     break;
 
+                case ProtocolConstants.CMD_ENROLL_CLASS:
+                    var enrollResponse = _classService.HandleEnrollClass(message.Data, Id);
+                    _protocolHandler.SendMessage(_clientSocket, enrollResponse);
+                    break;
+
                 default:
                     SendResponse(message.Command, "Comando desconocido");
                     break;

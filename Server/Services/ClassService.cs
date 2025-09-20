@@ -170,4 +170,91 @@ public class ClassService
             sb.ToString()
         );
     }
+
+    public ProtocolMessage HandleEnrollClass(string data, Guid clientId)
+    {
+        // Verificar autenticación
+        if (!UserService.Instance.IsUserLoggedIn(clientId))
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                "Acción no permitida. Debes iniciar sesión primero."
+            );
+        }
+
+        try
+        {
+            // Parsear el ID de la clase
+            if (!int.TryParse(data, out var classId))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "ID de clase inválido"
+                );
+            }
+
+            // Buscar la clase
+            var targetClass = _classes.FirstOrDefault(c => c.Id == classId);
+            if (targetClass == null)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Clase no encontrada"
+                );
+            }
+
+            // Obtener el nombre de usuario actual
+            var username = UserService.Instance.GetLoggedInUsername(clientId);
+            if (string.IsNullOrEmpty(username))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se pudo obtener el usuario actual"
+                );
+            }
+
+            // Verificar si ya está inscrito
+            if (targetClass.EnrolledUsers.Contains(username))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Ya estás inscrito en esta clase"
+                );
+            }
+
+            // Verificar si hay cupos disponibles
+            if (targetClass.EnrolledUsers.Count >= targetClass.MaxSeats)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No hay cupos disponibles para esta clase"
+                );
+            }
+
+            // Inscribir al usuario
+            targetClass.EnrolledUsers.Add(username);
+
+            Console.WriteLine($"Usuario '{username}' inscrito en clase '{targetClass.Name}' (ID: {targetClass.Id})");
+
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ENROLL_CLASS,
+                $"OK|Inscripción exitosa en la clase '{targetClass.Name}'"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                $"Error inesperado: {ex.Message}"
+            );
+        }
+    }
 }

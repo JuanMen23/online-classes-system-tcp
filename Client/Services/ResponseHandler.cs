@@ -47,6 +47,10 @@ public class ResponseHandler
                 HandleClassListResponse(response);
                 break;
 
+            case ProtocolConstants.CMD_ENROLL_CLASS:
+                HandleClassEnrollmentResponse(response);
+                break;
+
             case ProtocolConstants.CMD_ERROR:
                 HandleErrorResponse(response);
                 break;
@@ -136,6 +140,24 @@ public class ResponseHandler
     private void HandleClassListResponse(ProtocolMessage response)
     {
         _menuManager.DisplayClassList(response.Data);
+    }
+
+    /// <summary>
+    /// Handles class enrollment response from server
+    /// </summary>
+    /// <param name="response">Class enrollment response message</param>
+    private void HandleClassEnrollmentResponse(ProtocolMessage response)
+    {
+        if (response.Data.StartsWith("OK|"))
+        {
+            var parts = response.Data.Split('|');
+            var message = parts.Length > 1 ? parts[1] : "Inscripción exitosa";
+            _menuManager.ShowSuccess(message);
+        }
+        else
+        {
+            _menuManager.ShowError($"Error en la inscripción: {response.Data}");
+        }
     }
 
     /// <summary>
