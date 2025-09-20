@@ -51,6 +51,10 @@ public class ResponseHandler
                 HandleClassEnrollmentResponse(response);
                 break;
 
+            case ProtocolConstants.CMD_CANCEL_ENROLL:
+                HandleClassCancellationResponse(response);
+                break;
+
             case ProtocolConstants.CMD_ERROR:
                 HandleErrorResponse(response);
                 break;
@@ -157,6 +161,24 @@ public class ResponseHandler
         else
         {
             _menuManager.ShowError($"Error en la inscripción: {response.Data}");
+        }
+    }
+
+    /// <summary>
+    /// Handles class enrollment cancellation response from server
+    /// </summary>
+    /// <param name="response">Class cancellation response message</param>
+    private void HandleClassCancellationResponse(ProtocolMessage response)
+    {
+        if (response.Data.StartsWith("OK|"))
+        {
+            var parts = response.Data.Split('|');
+            var message = parts.Length > 1 ? parts[1] : "Cancelación de inscripción exitosa";
+            _menuManager.ShowSuccess(message);
+        }
+        else
+        {
+            _menuManager.ShowError($"Error al cancelar la inscripción: {response.Data}");
         }
     }
 

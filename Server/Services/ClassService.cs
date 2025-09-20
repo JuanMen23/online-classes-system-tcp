@@ -257,4 +257,92 @@ public class ClassService
             );
         }
     }
+
+    public ProtocolMessage HandleCancelEnrollment(string data, Guid clientId)
+    {
+        // Verificar autenticación
+        if (!UserService.Instance.IsUserLoggedIn(clientId))
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                "Acción no permitida. Debes iniciar sesión primero."
+            );
+        }
+
+        try
+        {
+            // Parsear el ID de la clase
+            if (!int.TryParse(data, out var classId))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "ID de clase inválido"
+                );
+            }
+
+            // Buscar la clase
+            var targetClass = _classes.FirstOrDefault(c => c.Id == classId);
+            if (targetClass == null)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "Clase no encontrada"
+                );
+            }
+
+            // Obtener el nombre de usuario actual
+            var username = UserService.Instance.GetLoggedInUsername(clientId);
+            if (string.IsNullOrEmpty(username))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se pudo obtener el usuario actual"
+                );
+            }
+
+            // Verificar si está inscrito en la clase
+            if (!targetClass.EnrolledUsers.Contains(username))
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No estás inscrito en esta clase"
+                );
+            }
+
+            // Validar que la cancelación se realice con al menos 2 minutos de antelación
+            var timeUntilClass = targetClass.StartDateTime - DateTime.Now;
+            if (timeUntilClass.TotalMinutes < 2)
+            {
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se puede cancelar la inscripción. Debe hacerlo con al menos 2 minutos de antelación al inicio de la clase."
+                );
+            }
+
+            // Cancelar la inscripción (remover usuario de la lista)
+            targetClass.EnrolledUsers.Remove(username);
+
+            Console.WriteLine($"Usuario '{username}' canceló su inscripción en la clase '{targetClass.Name}' (ID: {targetClass.Id})");
+
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_CANCEL_ENROLL,
+                $"OK|Inscripción cancelada exitosamente en la clase '{targetClass.Name}'. El cupo queda disponible para otros usuarios."
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                $"Error inesperado: {ex.Message}"
+            );
+        }
+    }
 }

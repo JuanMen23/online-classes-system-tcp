@@ -27,7 +27,8 @@ public class MenuManager
         Console.WriteLine("1. Crear clase");
         Console.WriteLine("2. Ver clases disponibles");
         Console.WriteLine("3. Inscribirse en clase");
-        Console.WriteLine("4. Cerrar Sesión (Logout)");
+        Console.WriteLine("4. Cancelar inscripción");
+        Console.WriteLine("5. Cerrar Sesión (Logout)");
         Console.Write("\n > Seleccione una opción: ");
     }
 
@@ -170,6 +171,16 @@ public class MenuManager
     public string PromptClassEnrollment()
     {
         Console.Write("Ingrese el ID de la clase a la que desea inscribirse: ");
+        return Console.ReadLine() ?? "";
+    }
+
+    /// <summary>
+    /// Prompts for class enrollment cancellation
+    /// </summary>
+    /// <returns>Class ID as string</returns>
+    public string PromptClassCancellation()
+    {
+        Console.Write("Ingrese el ID de la clase de la cual desea cancelar su inscripción: ");
         return Console.ReadLine() ?? "";
     }
 

@@ -162,4 +162,37 @@ public class ClassController
             _menuManager.ShowError($"Error al inscribirse en la clase: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Handles class enrollment cancellation process
+    /// </summary>
+    /// <param name="socketService">Socket service for sending messages</param>
+    /// <param name="setWaitingForResponse">Callback to set waiting state</param>
+    public void CancelEnrollment(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        try
+        {
+            var classId = _menuManager.PromptClassCancellation();
+
+            if (string.IsNullOrEmpty(classId))
+            {
+                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                return;
+            }
+
+            var request = new ProtocolMessage(
+                ProtocolConstants.HEADER_REQUEST,
+                ProtocolConstants.CMD_CANCEL_ENROLL,
+                classId
+            );
+
+            setWaitingForResponse(true);
+            socketService.SendMessage(request);
+            _menuManager.ShowInfo("Solicitud de cancelación de inscripción enviada.");
+        }
+        catch (Exception ex)
+        {
+            _menuManager.ShowError($"Error al cancelar la inscripción: {ex.Message}");
+        }
+    }
 }

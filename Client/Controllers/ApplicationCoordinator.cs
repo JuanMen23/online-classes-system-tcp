@@ -138,6 +138,9 @@ public class ApplicationCoordinator
                 _classController.EnrollInClass(_socketService, SetWaitingForResponse);
                 break;
             case "4":
+                _classController.CancelEnrollment(_socketService, SetWaitingForResponse);
+                break;
+            case "5":
                 _authController.HandleLogout(_socketService, SetWaitingForResponse);
                 break;
             default:

@@ -132,6 +132,11 @@ public class ClientHandler
                     _protocolHandler.SendMessage(_clientSocket, enrollResponse);
                     break;
 
+                case ProtocolConstants.CMD_CANCEL_ENROLL:
+                    var cancelResponse = _classService.HandleCancelEnrollment(message.Data, Id);
+                    _protocolHandler.SendMessage(_clientSocket, cancelResponse);
+                    break;
+
                 default:
                     SendResponse(message.Command, "Comando desconocido");
                     break;
