@@ -1,5 +1,4 @@
 using System.Net.Sockets;
-using System.Text;
 using Common.Protocol;
 using Server.ClassSession;
 
@@ -119,11 +118,13 @@ public class ClientHandler
                     break;
 
                 case ProtocolConstants.CMD_CREATE_CLASS:
-                    HandleCreateClass(message);
+                    var createResponse = _classService.HandleCreateClass(message.Data, Id);
+                    _protocolHandler.SendMessage(_clientSocket, createResponse);
                     break;
 
                 case ProtocolConstants.CMD_LIST_CLASSES:
-                    HandleListClasses();
+                    var listResponse = _classService.HandleListClasses();
+                    _protocolHandler.SendMessage(_clientSocket, listResponse);
                     break;
 
                 default:
@@ -138,88 +139,6 @@ public class ClientHandler
         }
     }
 
-    private void HandleCreateClass(ProtocolMessage message)
-    {
-        if (!_userService.IsUserLoggedIn(Id))
-        {
-            SendErrorResponse("Acción no permitida. Debes iniciar sesión primero.");
-            return;
-        }
-
-        try
-        {
-            var parts = message.Data.Split('|');
-            if (parts.Length < 5)
-            {
-                SendErrorResponse("Datos insuficientes para crear la clase");
-                return;
-            }
-
-            var name = parts[0];
-            var description = parts[1];
-
-            if (!int.TryParse(parts[2], out var maxSeats) || maxSeats <= 0)
-            {
-                SendErrorResponse("Número de cupos inválido");
-                return;
-            }
-            if (!DateTime.TryParse(parts[3], out var startDateTime))
-            {
-                SendErrorResponse("Fecha inválida");
-                return;
-            }
-            if (!int.TryParse(parts[4], out var durationMinutes) || durationMinutes <= 0)
-            {
-                SendErrorResponse("Duración inválida");
-                return;
-            }
-
-            var imageBase64 = parts.Length > 5 ? parts[5] : null;
-
-            var createdClass = _classService.CreateClassWithDetails(
-                name, description, maxSeats, startDateTime, durationMinutes, imageBase64
-            );
-
-            var response = new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_CREATE_CLASS,
-                $"OK|{createdClass.Id}|{createdClass.Link}"
-            );
-            _protocolHandler.SendMessage(_clientSocket, response);
-        }
-        catch (ArgumentException ex)
-        {
-            SendErrorResponse(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            SendErrorResponse($"Error inesperado: {ex.Message}");
-        }
-    }
-
-    private void HandleListClasses()
-    {
-        var classes = _classService.GetAllClasses();
-
-        var sb = new StringBuilder();
-        foreach (var c in classes)
-        {
-            string hasImage = string.IsNullOrEmpty(c.ImagePath) ? "No" : "Sí";
-            int enrolled = c.EnrolledUsers.Count;
-
-            sb.AppendLine($"{c.Id} | {c.Name} | {c.Description} | " +
-                          $"{c.StartDateTime:yyyy-MM-dd HH:mm} | {c.DurationMinutes} min | " +
-                          $"Cupos: {enrolled}/{c.MaxSeats} | Imagen: {hasImage}");
-        }
-
-        var response = new ProtocolMessage(
-            ProtocolConstants.HEADER_RESPONSE,
-            ProtocolConstants.CMD_LIST_CLASSES,
-            sb.ToString()
-        );
-
-        _protocolHandler.SendMessage(_clientSocket, response);
-    }
 
     private void SendResponse(int command, string data)
     {

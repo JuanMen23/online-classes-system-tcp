@@ -227,6 +227,7 @@ public class ClientApplication
             data
         );
 
+        _waitingForServerResponse = true;
         _socketService.SendMessage(request);
         Console.WriteLine("Solicitud de creación de clase enviada.");
     }
@@ -239,6 +240,7 @@ public class ClientApplication
             "" // no necesitamos data
         );
 
+        _waitingForServerResponse = true;
         _socketService.SendMessage(request);
         Console.WriteLine("Solicitud de listado de clases enviada.");
     }
@@ -288,6 +290,20 @@ public class ClientApplication
                         Console.WriteLine("\n-> Sesión cerrada correctamente.");
                         break;
 
+                    case ProtocolConstants.CMD_CREATE_CLASS:
+                        if (response.Data.StartsWith("OK|"))
+                        {
+                            var parts = response.Data.Split('|');
+                            Console.WriteLine($"✅ ¡Clase creada exitosamente!");
+                            Console.WriteLine($"   ID: {parts[1]}");
+                            Console.WriteLine($"   Link: {parts[2]}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"⚠️ Error al crear clase: {response.Data}");
+                        }
+                        break;
+
                     case ProtocolConstants.CMD_LIST_CLASSES:
                         Console.WriteLine("===== Clases disponibles =====");
                         Console.WriteLine(response.Data);
@@ -303,10 +319,6 @@ public class ClientApplication
                 }
 
                 _waitingForServerResponse = false;
-                if (_isRunning)
-                {
-                    Console.Write("\n> ");
-                }
             }
         }
         catch (Exception)
