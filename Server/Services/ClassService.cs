@@ -13,7 +13,8 @@ public class ClassService
     private static readonly Lazy<ClassService> _instance = new(() => new ClassService());
     public static ClassService Instance => _instance.Value;
 
-    private readonly ConcurrentBag<ClassSession> _classes = new();
+    private readonly ConcurrentDictionary<int, ClassSession> _classes = new();
+    private readonly ConcurrentDictionary<int, SemaphoreSlim> _classLocks = new();
     private int _nextId = 1;
     private readonly object _lockNextId = new object();
 
@@ -40,7 +41,7 @@ public class ClassService
             CreatedBy = createdBy
         };
 
-        _classes.Add(newClass);
+        _classes.TryAdd(id, newClass);
         return newClass;
     }
     
@@ -66,7 +67,7 @@ public class ClassService
         return createdClass;
     }
 
-    public IEnumerable<ClassSession> GetAllClasses() => _classes.ToList();
+    public IEnumerable<ClassSession> GetAllClasses() => _classes.Values.ToList();
 
     public ProtocolMessage HandleCreateClass(string data, Guid clientId)
     {
@@ -169,7 +170,7 @@ public class ClassService
         foreach (var c in classes)
         {
             string hasImage = string.IsNullOrEmpty(c.ImagePath) ? "No" : "Sí";
-            int enrolled = c.EnrolledUsers.Count;
+            int enrolled = c.EnrolledCount;
 
             sb.AppendLine($"{c.Id} | {c.Name} | {c.Description} | " +
                           $"{c.StartDateTime:yyyy-MM-dd HH:mm} | {c.DurationMinutes} min | " +
@@ -208,8 +209,7 @@ public class ClassService
             }
 
             // Buscar la clase
-            var targetClass = _classes.FirstOrDefault(c => c.Id == classId);
-            if (targetClass == null)
+            if (!_classes.TryGetValue(classId, out var targetClass))
             {
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
@@ -229,36 +229,47 @@ public class ClassService
                 );
             }
 
-            // Verificar si ya está inscrito
-            if (targetClass.EnrolledUsers.Contains(username))
+            // Obtener semáforo para esta clase específica (locking granular)
+            var semaphore = _classLocks.GetOrAdd(classId, _ => new SemaphoreSlim(1, 1));
+            
+            semaphore.Wait();
+            try
             {
+                // Verificar si ya está inscrito (re-verificar dentro del lock)
+                if (targetClass.IsEnrolled(username))
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "Ya estás inscrito en esta clase"
+                    );
+                }
+
+                // Verificar si hay cupos disponibles (re-verificar dentro del lock)
+                if (targetClass.EnrolledCount >= targetClass.MaxSeats)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "No hay cupos disponibles para esta clase"
+                    );
+                }
+
+                // Inscribir al usuario de forma atómica
+                targetClass.EnrollUser(username);
+
+                Console.WriteLine($"Usuario '{username}' inscrito en clase '{targetClass.Name}' (ID: {targetClass.Id})");
+
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Ya estás inscrito en esta clase"
+                    ProtocolConstants.CMD_ENROLL_CLASS,
+                    $"OK|Inscripción exitosa en la clase '{targetClass.Name}'"
                 );
             }
-
-            // Verificar si hay cupos disponibles
-            if (targetClass.EnrolledUsers.Count >= targetClass.MaxSeats)
+            finally
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "No hay cupos disponibles para esta clase"
-                );
+                semaphore.Release();
             }
-
-            // Inscribir al usuario
-            targetClass.EnrolledUsers.Add(username);
-
-            Console.WriteLine($"Usuario '{username}' inscrito en clase '{targetClass.Name}' (ID: {targetClass.Id})");
-
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_ENROLL_CLASS,
-                $"OK|Inscripción exitosa en la clase '{targetClass.Name}'"
-            );
         }
         catch (Exception ex)
         {
@@ -295,8 +306,7 @@ public class ClassService
             }
 
             // Buscar la clase
-            var targetClass = _classes.FirstOrDefault(c => c.Id == classId);
-            if (targetClass == null)
+            if (!_classes.TryGetValue(classId, out var targetClass))
             {
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
@@ -316,37 +326,55 @@ public class ClassService
                 );
             }
 
-            // Verificar si está inscrito en la clase
-            if (!targetClass.EnrolledUsers.Contains(username))
+            // Obtener semáforo para esta clase específica (locking granular)
+            var semaphore = _classLocks.GetOrAdd(classId, _ => new SemaphoreSlim(1, 1));
+            
+            semaphore.Wait();
+            try
             {
+                // Verificar si está inscrito en la clase (re-verificar dentro del lock)
+                if (!targetClass.IsEnrolled(username))
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "No estás inscrito en esta clase"
+                    );
+                }
+
+                // Validar que la cancelación se realice con al menos 2 minutos de antelación
+                var timeUntilClass = targetClass.StartDateTime - DateTime.Now;
+                if (timeUntilClass.TotalMinutes < 2)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "No se puede cancelar la inscripción. Debe hacerlo con al menos 2 minutos de antelación al inicio de la clase."
+                    );
+                }
+
+                // Cancelar la inscripción de forma atómica
+                if (!targetClass.RemoveUser(username))
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "Error al cancelar la inscripción"
+                    );
+                }
+
+                Console.WriteLine($"Usuario '{username}' canceló su inscripción en la clase '{targetClass.Name}' (ID: {targetClass.Id})");
+
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "No estás inscrito en esta clase"
+                    ProtocolConstants.CMD_CANCEL_ENROLL,
+                    $"OK|Inscripción cancelada exitosamente en la clase '{targetClass.Name}'. El cupo queda disponible para otros usuarios."
                 );
             }
-
-            // Validar que la cancelación se realice con al menos 2 minutos de antelación
-            var timeUntilClass = targetClass.StartDateTime - DateTime.Now;
-            if (timeUntilClass.TotalMinutes < 2)
+            finally
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "No se puede cancelar la inscripción. Debe hacerlo con al menos 2 minutos de antelación al inicio de la clase."
-                );
+                semaphore.Release();
             }
-
-            // Cancelar la inscripción (remover usuario de la lista)
-            targetClass.EnrolledUsers.Remove(username);
-
-            Console.WriteLine($"Usuario '{username}' canceló su inscripción en la clase '{targetClass.Name}' (ID: {targetClass.Id})");
-
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_CANCEL_ENROLL,
-                $"OK|Inscripción cancelada exitosamente en la clase '{targetClass.Name}'. El cupo queda disponible para otros usuarios."
-            );
         }
         catch (Exception ex)
         {
@@ -393,8 +421,7 @@ public class ClassService
             }
 
             // Buscar la clase
-            var targetClass = _classes.FirstOrDefault(c => c.Id == classId);
-            if (targetClass == null)
+            if (!_classes.TryGetValue(classId, out var targetClass))
             {
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
@@ -414,121 +441,142 @@ public class ClassService
                 );
             }
 
-            // Verificar que el usuario sea el creador de la clase
-            if (targetClass.CreatedBy != username)
+            // Obtener semáforo para esta clase específica
+            var semaphore = _classLocks.GetOrAdd(classId, _ => new SemaphoreSlim(1, 1));
+            
+            semaphore.Wait();
+            try
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Solo el creador de la clase puede modificarla"
-                );
-            }
-
-            // Verificar que la clase no haya comenzado
-            if (targetClass.StartDateTime <= DateTime.Now)
-            {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "No se puede modificar una clase que ya ha comenzado"
-                );
-            }
-
-            // Parsear los nuevos datos
-            var newName = parts[1];
-            var newDescription = parts[2];
-
-            if (!int.TryParse(parts[3], out var newMaxSeats) || newMaxSeats <= 0)
-            {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Número de cupos inválido"
-                );
-            }
-
-            if (!DateTime.TryParse(parts[4], out var newStartDateTime))
-            {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Fecha inválida"
-                );
-            }
-
-            if (!int.TryParse(parts[5], out var newDurationMinutes) || newDurationMinutes <= 0)
-            {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Duración inválida"
-                );
-            }
-
-            // Verificar que el nuevo número de cupos no sea menor al número de usuarios inscritos
-            if (newMaxSeats < targetClass.EnrolledUsers.Count)
-            {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    $"No se puede reducir los cupos por debajo del número de usuarios inscritos ({targetClass.EnrolledUsers.Count})"
-                );
-            }
-
-            // Procesar imagen si se proporciona
-            var newImageBase64 = parts.Length > 6 ? parts[6] : null;
-            string? newImagePath = targetClass.ImagePath; // Mantener la imagen actual por defecto
-
-            if (!string.IsNullOrEmpty(newImageBase64))
-            {
-                try
-                {
-                    byte[] imageBytes = Convert.FromBase64String(newImageBase64);
-                    if (imageBytes.Length > 5 * 1024 * 1024)
-                    {
-                        return new ProtocolMessage(
-                            ProtocolConstants.HEADER_RESPONSE,
-                            ProtocolConstants.CMD_ERROR,
-                            "Imagen demasiado grande (máximo 5MB)"
-                        );
-                    }
-
-                    // Eliminar imagen anterior si existe
-                    if (!string.IsNullOrEmpty(targetClass.ImagePath) && File.Exists(targetClass.ImagePath))
-                    {
-                        File.Delete(targetClass.ImagePath);
-                    }
-
-                    // Guardar nueva imagen
-                    Directory.CreateDirectory("Images");
-                    newImagePath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
-                    File.WriteAllBytes(newImagePath, imageBytes);
-                }
-                catch (FormatException)
+                // Re-verificar que la clase aún existe dentro del lock
+                if (!_classes.TryGetValue(classId, out targetClass))
                 {
                     return new ProtocolMessage(
                         ProtocolConstants.HEADER_RESPONSE,
                         ProtocolConstants.CMD_ERROR,
-                        "Formato de imagen inválido"
+                        "Clase no encontrada"
                     );
                 }
+
+                // Verificar que el usuario sea el creador de la clase (re-verificar dentro del lock)
+                if (targetClass.CreatedBy != username)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "Solo el creador de la clase puede modificarla"
+                    );
+                }
+
+                // Verificar que la clase no haya comenzado (re-verificar dentro del lock)
+                if (targetClass.StartDateTime <= DateTime.Now)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "No se puede modificar una clase que ya ha comenzado"
+                    );
+                }
+
+                // Parsear los nuevos datos
+                var newName = parts[1];
+                var newDescription = parts[2];
+
+                if (!int.TryParse(parts[3], out var newMaxSeats) || newMaxSeats <= 0)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "Número de cupos inválido"
+                    );
+                }
+
+                if (!DateTime.TryParse(parts[4], out var newStartDateTime))
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "Fecha inválida"
+                    );
+                }
+
+                if (!int.TryParse(parts[5], out var newDurationMinutes) || newDurationMinutes <= 0)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "Duración inválida"
+                    );
+                }
+
+                // Verificar que el nuevo número de cupos no sea menor al número de usuarios inscritos
+                if (newMaxSeats < targetClass.EnrolledCount)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        $"No se puede reducir los cupos por debajo del número de usuarios inscritos ({targetClass.EnrolledCount})"
+                    );
+                }
+
+                // Procesar imagen si se proporciona
+                var newImageBase64 = parts.Length > 6 ? parts[6] : null;
+                string? newImagePath = targetClass.ImagePath; // Mantener la imagen actual por defecto
+
+                if (!string.IsNullOrEmpty(newImageBase64))
+                {
+                    try
+                    {
+                        byte[] imageBytes = Convert.FromBase64String(newImageBase64);
+                        if (imageBytes.Length > 5 * 1024 * 1024)
+                        {
+                            return new ProtocolMessage(
+                                ProtocolConstants.HEADER_RESPONSE,
+                                ProtocolConstants.CMD_ERROR,
+                                "Imagen demasiado grande (máximo 5MB)"
+                            );
+                        }
+
+                        // Eliminar imagen anterior si existe
+                        if (!string.IsNullOrEmpty(targetClass.ImagePath) && File.Exists(targetClass.ImagePath))
+                        {
+                            File.Delete(targetClass.ImagePath);
+                        }
+
+                        // Guardar nueva imagen
+                        Directory.CreateDirectory("Images");
+                        newImagePath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
+                        File.WriteAllBytes(newImagePath, imageBytes);
+                    }
+                    catch (FormatException)
+                    {
+                        return new ProtocolMessage(
+                            ProtocolConstants.HEADER_RESPONSE,
+                            ProtocolConstants.CMD_ERROR,
+                            "Formato de imagen inválido"
+                        );
+                    }
+                }
+
+                // Actualizar los datos de la clase
+                targetClass.Name = newName;
+                targetClass.Description = newDescription;
+                targetClass.MaxSeats = newMaxSeats;
+                targetClass.StartDateTime = newStartDateTime;
+                targetClass.DurationMinutes = newDurationMinutes;
+                targetClass.ImagePath = newImagePath;
+
+                Console.WriteLine($"Clase modificada: {targetClass.Id} ({targetClass.Name}) por {username}");
+
+                return new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_MODIFY_CLASS,
+                    $"OK|Clase '{targetClass.Name}' modificada exitosamente"
+                );
             }
-
-            // Actualizar los datos de la clase
-            targetClass.Name = newName;
-            targetClass.Description = newDescription;
-            targetClass.MaxSeats = newMaxSeats;
-            targetClass.StartDateTime = newStartDateTime;
-            targetClass.DurationMinutes = newDurationMinutes;
-            targetClass.ImagePath = newImagePath;
-
-            Console.WriteLine($"Clase modificada: {targetClass.Id} ({targetClass.Name}) por {username}");
-
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_MODIFY_CLASS,
-                $"OK|Clase '{targetClass.Name}' modificada exitosamente"
-            );
+            finally
+            {
+                semaphore.Release();
+            }
         }
         catch (ArgumentException ex)
         {
@@ -573,8 +621,7 @@ public class ClassService
             }
 
             // Buscar la clase
-            var targetClass = _classes.FirstOrDefault(c => c.Id == classId);
-            if (targetClass == null)
+            if (!_classes.TryGetValue(classId, out var targetClass))
             {
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
@@ -594,74 +641,93 @@ public class ClassService
                 );
             }
 
-            // Verificar que el usuario sea el creador de la clase
-            if (targetClass.CreatedBy != username)
+            // Obtener semáforo para esta clase específica
+            var semaphore = _classLocks.GetOrAdd(classId, _ => new SemaphoreSlim(1, 1));
+            
+            semaphore.Wait();
+            try
             {
+                // Re-verificar que la clase aún existe dentro del lock
+                if (!_classes.TryGetValue(classId, out targetClass))
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "Clase no encontrada"
+                    );
+                }
+
+                // Verificar que el usuario sea el creador de la clase (re-verificar dentro del lock)
+                if (targetClass.CreatedBy != username)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "Solo el creador de la clase puede eliminarla"
+                    );
+                }
+
+                // Verificar que no haya usuarios inscritos (re-verificar dentro del lock)
+                if (targetClass.EnrolledCount > 0)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "No se puede eliminar una clase que tiene usuarios inscritos"
+                    );
+                }
+
+                // Verificar que la clase no haya comenzado (re-verificar dentro del lock)
+                if (targetClass.StartDateTime <= DateTime.Now)
+                {
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_ERROR,
+                        "No se puede eliminar una clase que ya ha comenzado"
+                    );
+                }
+
+                // Eliminar la clase de forma atómica dentro del lock
+                if (_classes.TryRemove(classId, out var removedClass))
+                {
+                    // Eliminar imagen asociada si existe
+                    if (!string.IsNullOrEmpty(removedClass.ImagePath) && File.Exists(removedClass.ImagePath))
+                    {
+                        try
+                        {
+                            File.Delete(removedClass.ImagePath);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Advertencia: No se pudo eliminar la imagen {removedClass.ImagePath}: {ex.Message}");
+                        }
+                    }
+
+                    // Limpiar el semáforo asociado si existe
+                    if (_classLocks.TryRemove(classId, out var semaphoreToDispose))
+                    {
+                        semaphoreToDispose.Dispose();
+                    }
+
+                    Console.WriteLine($"Clase eliminada: {removedClass.Id} ({removedClass.Name}) por {username}");
+
+                    return new ProtocolMessage(
+                        ProtocolConstants.HEADER_RESPONSE,
+                        ProtocolConstants.CMD_DELETE_CLASS,
+                        $"OK|Clase '{removedClass.Name}' eliminada exitosamente"
+                    );
+                }
+
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
                     ProtocolConstants.CMD_ERROR,
-                    "Solo el creador de la clase puede eliminarla"
+                    "Error al eliminar la clase"
                 );
             }
-
-            // Verificar que no haya usuarios inscritos
-            if (targetClass.EnrolledUsers.Count > 0)
+            finally
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "No se puede eliminar una clase que tiene usuarios inscritos"
-                );
+                semaphore.Release();
             }
-
-            // Verificar que la clase no haya comenzado
-            if (targetClass.StartDateTime <= DateTime.Now)
-            {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "No se puede eliminar una clase que ya ha comenzado"
-                );
-            }
-
-            // Eliminar imagen asociada si existe
-            if (!string.IsNullOrEmpty(targetClass.ImagePath) && File.Exists(targetClass.ImagePath))
-            {
-                try
-                {
-                    File.Delete(targetClass.ImagePath);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Advertencia: No se pudo eliminar la imagen {targetClass.ImagePath}: {ex.Message}");
-                }
-            }
-
-            // Eliminar la clase de la colección
-            var classList = _classes.ToList();
-            var classToRemove = classList.FirstOrDefault(c => c.Id == classId);
-            if (classToRemove != null)
-            {
-                // Como ConcurrentBag no tiene Remove, necesitamos recrear la colección sin el elemento
-                var newClasses = classList.Where(c => c.Id != classId).ToList();
-                
-                // Limpiar la colección actual
-                while (_classes.TryTake(out _)) { }
-                
-                // Agregar todas las clases excepto la eliminada
-                foreach (var cls in newClasses)
-                {
-                    _classes.Add(cls);
-                }
-            }
-
-            Console.WriteLine($"Clase eliminada: {targetClass.Id} ({targetClass.Name}) por {username}");
-
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_DELETE_CLASS,
-                $"OK|Clase '{targetClass.Name}' eliminada exitosamente"
-            );
         }
         catch (Exception ex)
         {

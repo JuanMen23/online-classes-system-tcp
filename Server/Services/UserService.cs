@@ -8,6 +8,7 @@ public class UserService
     private static readonly Lazy<UserService> _instance = new(() => new UserService());
     private readonly ConcurrentDictionary<string, User.User> _registeredUsers = new();
     private readonly ConcurrentDictionary<Guid, string> _activeSessions = new();
+    private readonly object _sessionLock = new object();
     
     public static UserService Instance => _instance.Value;
 
@@ -26,15 +27,19 @@ public class UserService
     {
          if (_registeredUsers.TryGetValue(username, out User.User user) && user.Password == password)
          {
-              // Avoid double login
-              if (_activeSessions.Values.Contains(username))
+              // Double-checked locking para evitar login duplicado
+              lock (_sessionLock)
               {
-                   return ProtocolConstants.RESPONSE_ERROR_USER_ALREADY_LOGGED_IN;
-              }
+                   // Re-verificar dentro del lock
+                   if (_activeSessions.Values.Contains(username))
+                   {
+                        return ProtocolConstants.RESPONSE_ERROR_USER_ALREADY_LOGGED_IN;
+                   }
 
-              _activeSessions.TryAdd(clientId, username);
-              Console.WriteLine($"➡️ Usuario inició sesión: '{username}' (ID de conexión: {clientId})");
-              return ProtocolConstants.RESPONSE_OK;
+                   _activeSessions.TryAdd(clientId, username);
+                   Console.WriteLine($"➡️ Usuario inició sesión: '{username}' (ID de conexión: {clientId})");
+                   return ProtocolConstants.RESPONSE_OK;
+              }
          }
 
          return ProtocolConstants.RESPONSE_ERROR_INVALID_CREDENTIALS;
