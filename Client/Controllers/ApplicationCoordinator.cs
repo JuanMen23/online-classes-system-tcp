@@ -132,9 +132,21 @@ public class ApplicationCoordinator
                 _classController.CreateClass(_socketService, SetWaitingForResponse);
                 break;
             case "2":
-                _classController.RequestClassList(_socketService, SetWaitingForResponse);
+                _classController.ModifyClass(_socketService, SetWaitingForResponse);
                 break;
             case "3":
+                _classController.DeleteClass(_socketService, SetWaitingForResponse);
+                break;
+            case "4":
+                _classController.RequestClassList(_socketService, SetWaitingForResponse);
+                break;
+            case "5":
+                _classController.EnrollInClass(_socketService, SetWaitingForResponse);
+                break;
+            case "6":
+                _classController.CancelEnrollment(_socketService, SetWaitingForResponse);
+                break;
+            case "7":
                 _authController.HandleLogout(_socketService, SetWaitingForResponse);
                 break;
             default:

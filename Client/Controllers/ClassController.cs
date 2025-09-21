@@ -129,4 +129,168 @@ public class ClassController
     {
         return _inputValidator.FormatClassData(name, description, maxSeats, startDateTime, duration, imageBase64);
     }
+
+    /// <summary>
+    /// Handles class enrollment process
+    /// </summary>
+    /// <param name="socketService">Socket service for sending messages</param>
+    /// <param name="setWaitingForResponse">Callback to set waiting state</param>
+    public void EnrollInClass(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        try
+        {
+            var classId = _menuManager.PromptClassEnrollment();
+
+            if (string.IsNullOrEmpty(classId))
+            {
+                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                return;
+            }
+
+            var request = new ProtocolMessage(
+                ProtocolConstants.HEADER_REQUEST,
+                ProtocolConstants.CMD_ENROLL_CLASS,
+                classId
+            );
+
+            setWaitingForResponse(true);
+            socketService.SendMessage(request);
+            _menuManager.ShowInfo("Solicitud de inscripción enviada.");
+        }
+        catch (Exception ex)
+        {
+            _menuManager.ShowError($"Error al inscribirse en la clase: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles class enrollment cancellation process
+    /// </summary>
+    /// <param name="socketService">Socket service for sending messages</param>
+    /// <param name="setWaitingForResponse">Callback to set waiting state</param>
+    public void CancelEnrollment(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        try
+        {
+            var classId = _menuManager.PromptClassCancellation();
+
+            if (string.IsNullOrEmpty(classId))
+            {
+                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                return;
+            }
+
+            var request = new ProtocolMessage(
+                ProtocolConstants.HEADER_REQUEST,
+                ProtocolConstants.CMD_CANCEL_ENROLL,
+                classId
+            );
+
+            setWaitingForResponse(true);
+            socketService.SendMessage(request);
+            _menuManager.ShowInfo("Solicitud de cancelación de inscripción enviada.");
+        }
+        catch (Exception ex)
+        {
+            _menuManager.ShowError($"Error al cancelar la inscripción: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles class modification process
+    /// </summary>
+    /// <param name="socketService">Socket service for sending messages</param>
+    /// <param name="setWaitingForResponse">Callback to set waiting state</param>
+    public void ModifyClass(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        try
+        {
+            var (classId, name, description, maxSeats, duration, startDateTime, imagePath) = _menuManager.PromptClassModification();
+
+            if (string.IsNullOrEmpty(classId))
+            {
+                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                return;
+            }
+
+            if (!_inputValidator.ValidateClassData(name, description, maxSeats, duration))
+            {
+                _menuManager.ShowError("Datos de clase inválidos. Intente nuevamente.");
+                return;
+            }
+
+            string imageBase64 = "";
+            if (!string.IsNullOrEmpty(imagePath))
+            {
+                try
+                {
+                    imageBase64 = _inputValidator.ReadImageFile(imagePath);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _menuManager.ShowError(ex.Message);
+                    return;
+                }
+            }
+
+            var data = $"{classId}|{name}|{description}|{maxSeats}|{startDateTime:yyyy-MM-dd HH:mm}|{duration}|{imageBase64}";
+
+            var request = new ProtocolMessage(
+                ProtocolConstants.HEADER_REQUEST,
+                ProtocolConstants.CMD_MODIFY_CLASS,
+                data
+            );
+
+            setWaitingForResponse(true);
+            socketService.SendMessage(request);
+            _menuManager.ShowInfo("Solicitud de modificación de clase enviada.");
+        }
+        catch (Exception ex)
+        {
+            _menuManager.ShowError($"Error al modificar la clase: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles class deletion process
+    /// </summary>
+    /// <param name="socketService">Socket service for sending messages</param>
+    /// <param name="setWaitingForResponse">Callback to set waiting state</param>
+    public void DeleteClass(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        try
+        {
+            var classId = _menuManager.PromptClassDeletion();
+
+            if (string.IsNullOrEmpty(classId))
+            {
+                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                return;
+            }
+
+            // Confirmar eliminación
+            Console.Write("¿Está seguro que desea eliminar esta clase? (s/N): ");
+            var confirmation = Console.ReadLine()?.ToLower();
+            
+            if (confirmation != "s" && confirmation != "sí" && confirmation != "si")
+            {
+                _menuManager.ShowInfo("Operación cancelada.");
+                return;
+            }
+
+            var request = new ProtocolMessage(
+                ProtocolConstants.HEADER_REQUEST,
+                ProtocolConstants.CMD_DELETE_CLASS,
+                classId
+            );
+
+            setWaitingForResponse(true);
+            socketService.SendMessage(request);
+            _menuManager.ShowInfo("Solicitud de eliminación de clase enviada.");
+        }
+        catch (Exception ex)
+        {
+            _menuManager.ShowError($"Error al eliminar la clase: {ex.Message}");
+        }
+    }
 }

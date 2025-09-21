@@ -43,8 +43,24 @@ public class ResponseHandler
                 HandleClassCreationResponse(response);
                 break;
 
+            case ProtocolConstants.CMD_MODIFY_CLASS:
+                HandleClassModificationResponse(response);
+                break;
+
+            case ProtocolConstants.CMD_DELETE_CLASS:
+                HandleClassDeletionResponse(response);
+                break;
+
             case ProtocolConstants.CMD_LIST_CLASSES:
                 HandleClassListResponse(response);
+                break;
+
+            case ProtocolConstants.CMD_ENROLL_CLASS:
+                HandleClassEnrollmentResponse(response);
+                break;
+
+            case ProtocolConstants.CMD_CANCEL_ENROLL:
+                HandleClassCancellationResponse(response);
                 break;
 
             case ProtocolConstants.CMD_ERROR:
@@ -130,12 +146,80 @@ public class ResponseHandler
     }
 
     /// <summary>
+    /// Handles class modification response from server
+    /// </summary>
+    /// <param name="response">Class modification response message</param>
+    private void HandleClassModificationResponse(ProtocolMessage response)
+    {
+        if (response.Data.StartsWith("OK|"))
+        {
+            _menuManager.ShowSuccess(response.Data.Substring(3)); // Mostrar el mensaje después de "OK|"
+        }
+        else
+        {
+            _menuManager.ShowError($"Error al modificar clase: {response.Data}");
+        }
+    }
+
+    /// <summary>
+    /// Handles class deletion response from server
+    /// </summary>
+    /// <param name="response">Class deletion response message</param>
+    private void HandleClassDeletionResponse(ProtocolMessage response)
+    {
+        if (response.Data.StartsWith("OK|"))
+        {
+            _menuManager.ShowSuccess(response.Data.Substring(3)); // Mostrar el mensaje después de "OK|"
+        }
+        else
+        {
+            _menuManager.ShowError($"Error al eliminar clase: {response.Data}");
+        }
+    }
+
+    /// <summary>
     /// Handles class list response from server
     /// </summary>
     /// <param name="response">Class list response message</param>
     private void HandleClassListResponse(ProtocolMessage response)
     {
         _menuManager.DisplayClassList(response.Data);
+    }
+
+    /// <summary>
+    /// Handles class enrollment response from server
+    /// </summary>
+    /// <param name="response">Class enrollment response message</param>
+    private void HandleClassEnrollmentResponse(ProtocolMessage response)
+    {
+        if (response.Data.StartsWith("OK|"))
+        {
+            var parts = response.Data.Split('|');
+            var message = parts.Length > 1 ? parts[1] : "Inscripción exitosa";
+            _menuManager.ShowSuccess(message);
+        }
+        else
+        {
+            _menuManager.ShowError($"Error en la inscripción: {response.Data}");
+        }
+    }
+
+    /// <summary>
+    /// Handles class enrollment cancellation response from server
+    /// </summary>
+    /// <param name="response">Class cancellation response message</param>
+    private void HandleClassCancellationResponse(ProtocolMessage response)
+    {
+        if (response.Data.StartsWith("OK|"))
+        {
+            var parts = response.Data.Split('|');
+            var message = parts.Length > 1 ? parts[1] : "Cancelación de inscripción exitosa";
+            _menuManager.ShowSuccess(message);
+        }
+        else
+        {
+            _menuManager.ShowError($"Error al cancelar la inscripción: {response.Data}");
+        }
     }
 
     /// <summary>

@@ -1,6 +1,6 @@
 using System.Net.Sockets;
 using Common.Protocol;
-using Server.ClassSession;
+using Server.Data;
 
 namespace Server.Services;
 
@@ -122,9 +122,29 @@ public class ClientHandler
                     _protocolHandler.SendMessage(_clientSocket, createResponse);
                     break;
 
+                case ProtocolConstants.CMD_MODIFY_CLASS:
+                    var modifyResponse = _classService.HandleModifyClass(message.Data, Id);
+                    _protocolHandler.SendMessage(_clientSocket, modifyResponse);
+                    break;
+
                 case ProtocolConstants.CMD_LIST_CLASSES:
                     var listResponse = _classService.HandleListClasses();
                     _protocolHandler.SendMessage(_clientSocket, listResponse);
+                    break;
+
+                case ProtocolConstants.CMD_ENROLL_CLASS:
+                    var enrollResponse = _classService.HandleEnrollClass(message.Data, Id);
+                    _protocolHandler.SendMessage(_clientSocket, enrollResponse);
+                    break;
+
+                case ProtocolConstants.CMD_CANCEL_ENROLL:
+                    var cancelResponse = _classService.HandleCancelEnrollment(message.Data, Id);
+                    _protocolHandler.SendMessage(_clientSocket, cancelResponse);
+                    break;
+
+                case ProtocolConstants.CMD_DELETE_CLASS:
+                    var deleteResponse = _classService.HandleDeleteClass(message.Data, Id);
+                    _protocolHandler.SendMessage(_clientSocket, deleteResponse);
                     break;
 
                 default:

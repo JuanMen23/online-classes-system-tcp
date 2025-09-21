@@ -25,8 +25,12 @@ public class MenuManager
     {
         Console.WriteLine($"--- Conectado como: {currentUser} ---");
         Console.WriteLine("1. Crear clase");
-        Console.WriteLine("2. Ver clases disponibles");
-        Console.WriteLine("3. Cerrar Sesión (Logout)");
+        Console.WriteLine("2. Modificar clase");
+        Console.WriteLine("3. Eliminar clase");
+        Console.WriteLine("4. Ver clases disponibles");
+        Console.WriteLine("5. Inscribirse en clase");
+        Console.WriteLine("6. Cancelar inscripción");
+        Console.WriteLine("7. Cerrar Sesión (Logout)");
         Console.Write("\n > Seleccione una opción: ");
     }
 
@@ -160,6 +164,94 @@ public class MenuManager
     public void ShowConnectionStatus(string message)
     {
         Console.WriteLine(message);
+    }
+
+    /// <summary>
+    /// Prompts for class enrollment
+    /// </summary>
+    /// <returns>Class ID as string</returns>
+    public string PromptClassEnrollment()
+    {
+        Console.Write("Ingrese el ID de la clase a la que desea inscribirse: ");
+        return Console.ReadLine() ?? "";
+    }
+
+    /// <summary>
+    /// Prompts for class enrollment cancellation
+    /// </summary>
+    /// <returns>Class ID as string</returns>
+    public string PromptClassCancellation()
+    {
+        Console.Write("Ingrese el ID de la clase de la cual desea cancelar su inscripción: ");
+        return Console.ReadLine() ?? "";
+    }
+
+    /// <summary>
+    /// Prompts for class modification data
+    /// </summary>
+    /// <returns>Class ID and modification data as tuple</returns>
+    public (string classId, string name, string description, int maxSeats, int duration, DateTime startDateTime, string imagePath) PromptClassModification()
+    {
+        Console.Write("Ingrese el ID de la clase que desea modificar: ");
+        string classId = Console.ReadLine() ?? "";
+
+        Console.WriteLine("Ingrese los nuevos datos para la clase:");
+        
+        Console.Write("Nombre: ");
+        string name = Console.ReadLine() ?? "";
+
+        Console.Write("Descripción: ");
+        string description = Console.ReadLine() ?? "";
+
+        // Cupos
+        int maxSeats;
+        while (true)
+        {
+            Console.Write("Cupos máximos: ");
+            string input = Console.ReadLine() ?? "";
+            if (int.TryParse(input, out maxSeats) && maxSeats > 0)
+                break;
+            Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
+        }
+
+        // Duración
+        int duration;
+        while (true)
+        {
+            Console.Write("Duración (minutos): ");
+            string input = Console.ReadLine() ?? "";
+            if (int.TryParse(input, out duration) && duration > 0)
+                break;
+            Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
+        }
+
+        // Fecha
+        DateTime startDateTime;
+        while (true)
+        {
+            Console.Write("Fecha y hora (yyyy-MM-dd HH:mm): ");
+            string input = Console.ReadLine() ?? "";
+            if (DateTime.TryParse(input, out startDateTime))
+                break;
+
+            Console.WriteLine("⚠️ Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
+        }
+
+        // Imagen
+        Console.Write("Ruta nueva imagen (opcional, dejar vacío para mantener la actual): ");
+        string imagePath = Console.ReadLine() ?? "";
+
+        return (classId, name, description, maxSeats, duration, startDateTime, imagePath);
+    }
+
+    /// <summary>
+    /// Prompts for class deletion
+    /// </summary>
+    /// <returns>Class ID as string</returns>
+    public string PromptClassDeletion()
+    {
+        Console.Write("Ingrese el ID de la clase que desea eliminar: ");
+        return Console.ReadLine() ?? "";
     }
 
     /// <summary>
