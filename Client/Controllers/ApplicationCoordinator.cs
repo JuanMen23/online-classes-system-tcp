@@ -123,7 +123,7 @@ public class ApplicationCoordinator
     {
         _menuManager.ShowLoggedInMenu(_authController.CurrentUser ?? "");
         string? choice = _menuManager.ReadLine();
-        
+    
         if (string.IsNullOrEmpty(choice)) return;
 
         switch (choice)
@@ -147,6 +147,9 @@ public class ApplicationCoordinator
                 _classController.CancelEnrollment(_socketService, SetWaitingForResponse);
                 break;
             case "7":
+                _classController.SearchClasses(_socketService, SetWaitingForResponse);
+                break;
+            case "8":
                 _authController.HandleLogout(_socketService, SetWaitingForResponse);
                 break;
             default:

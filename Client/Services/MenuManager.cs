@@ -30,7 +30,8 @@ public class MenuManager
         Console.WriteLine("4. Ver clases disponibles");
         Console.WriteLine("5. Inscribirse en clase");
         Console.WriteLine("6. Cancelar inscripción");
-        Console.WriteLine("7. Cerrar Sesión (Logout)");
+        Console.WriteLine("7. Buscar/filtrar clases");
+        Console.WriteLine("9. Cerrar Sesión (Logout)");
         Console.Write("\n > Seleccione una opción: ");
     }
 
