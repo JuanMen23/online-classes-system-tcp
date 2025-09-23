@@ -237,7 +237,7 @@ public class ResponseHandler
     /// <param name="response">Unknown response message</param>
     private void HandleUnknownResponse(ProtocolMessage response)
     {
-        Console.WriteLine($"Respuesta del servidor (CMD {response.Command}): {response.Data}");
+        Console.WriteLine($"{response.Data}");
     }
 
     /// <summary>
