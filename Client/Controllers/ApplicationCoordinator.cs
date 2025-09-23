@@ -150,6 +150,9 @@ public class ApplicationCoordinator
                 _classController.SearchClasses(_socketService, SetWaitingForResponse);
                 break;
             case "8":
+                _classController.RequestHistory(_socketService, SetWaitingForResponse);
+                break;
+            case "9":
                 _authController.HandleLogout(_socketService, SetWaitingForResponse);
                 break;
             default:

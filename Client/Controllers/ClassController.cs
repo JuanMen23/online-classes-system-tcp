@@ -351,5 +351,18 @@ public class ClassController
         socketService.SendMessage(request);
         Console.WriteLine("Solicitud de búsqueda enviada.");
     }
+    
+    public void RequestHistory(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        var request = new ProtocolMessage(
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_HISTORY,
+            ""
+        );
+
+        setWaitingForResponse(true);
+        socketService.SendMessage(request);
+        Console.WriteLine("Solicitud de historial enviada.");
+    }
 
 }
