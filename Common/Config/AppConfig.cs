@@ -1,4 +1,5 @@
 using System.Net;
+using Common.Protocol;
 
 namespace Common.Config;
 
@@ -7,20 +8,31 @@ namespace Common.Config;
 /// </summary>
 public class AppConfig
 {
+    private readonly SettingsManager _settings = new SettingsManager();
+    
     /// <summary>
     /// Server IP address
     /// </summary>
-    public string ServerIp { get; set; } = Protocol.ProtocolConstants.DEFAULT_SERVER_IP;
+    public string ServerIp { get; set; }
     
     /// <summary>
     /// Server port
     /// </summary>
-    public int ServerPort { get; set; } = Protocol.ProtocolConstants.DEFAULT_SERVER_PORT;
+    public int ServerPort { get; set; }
     
     /// <summary>
     /// Maximum number of queued connections
     /// </summary>
-    public int MaxBacklogConnections { get; set; } = Protocol.ProtocolConstants.MAX_BACKLOG_CONNECTIONS;
+    public int MaxBacklogConnections { get; set; } = ProtocolConstants.MAX_BACKLOG_CONNECTIONS;
+
+    public AppConfig()
+    {
+        ServerIp = _settings.ReadSettings("ServerIpAddress") ?? ProtocolConstants.DEFAULT_SERVER_IP;
+        var portStr = _settings.ReadSettings("ServerPort");
+        ServerPort = int.TryParse(portStr, out var parsedPort) 
+            ? parsedPort 
+            : ProtocolConstants.DEFAULT_SERVER_PORT;
+    }
     
     /// <summary>
     /// Gets the server endpoint
