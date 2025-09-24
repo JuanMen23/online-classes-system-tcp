@@ -33,13 +33,21 @@ public class ClassController
                 _menuManager.ShowError("Datos de clase inválidos. Intente nuevamente.");
                 return;
             }
-
             string imageBase64 = "";
             if (!string.IsNullOrEmpty(imagePath))
             {
                 try
                 {
+                    // -- File type validation --
+                    string extension = Path.GetExtension(imagePath).ToLower();
+                    if (extension != ".jpg" && extension != ".jpeg" && extension != ".png")
+                    {
+                        _menuManager.ShowError("El archivo debe ser una imagen (.jpg, .jpeg, .png).");
+                        return;
+                    }
+                    
                     imageBase64 = _inputValidator.ReadImageFile(imagePath);
+                    _menuManager.ShowSuccess("Imagen procesada exitosamente.");
                 }
                 catch (InvalidOperationException ex)
                 {
