@@ -51,14 +51,21 @@ public class ClassService
         string? imagePath = null;
         if (!string.IsNullOrEmpty(imageBase64))
         {
-            byte[] imageBytes = Convert.FromBase64String(imageBase64);
-            if (imageBytes.Length > 5 * 1024 * 1024)
+            try
             {
-                throw new ArgumentException("Imagen demasiado grande (máximo 5MB)");
+                byte[] imageBytes = Convert.FromBase64String(imageBase64);
+                
+                // Creates the Image folder on the Server if it doesn't exist
+                Directory.CreateDirectory("Images"); 
+                
+                string fileName = $"{Guid.NewGuid()}.png";
+                imagePath = Path.Combine("Images", fileName);
+                File.WriteAllBytes(imagePath, imageBytes);
             }
-            Directory.CreateDirectory("Images");
-            imagePath = Path.Combine("Images", $"{Guid.NewGuid()}.png");
-            File.WriteAllBytes(imagePath, imageBytes);
+            catch (FormatException)
+            {
+                throw new ArgumentException("Formato de imagen Base64 inválido");
+            }
         }
         
         var createdClass = CreateClass(name, description, maxSeats, startDateTime, durationMinutes, imagePath, createdBy);
