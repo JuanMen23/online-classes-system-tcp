@@ -146,6 +146,15 @@ public class ClientHandler
                     var deleteResponse = _classService.HandleDeleteClass(message.Data, Id);
                     _protocolHandler.SendMessage(_clientSocket, deleteResponse);
                     break;
+                
+                case ProtocolConstants.CMD_SEARCH_CLASSES:
+                    var searchResponse = _classService.HandleSearchClasses(message.Data);
+                    _protocolHandler.SendMessage(_clientSocket, searchResponse);
+                    break;
+                case ProtocolConstants.CMD_HISTORY:
+                    var historyResponse = _classService.HandleHistory(Id);
+                    _protocolHandler.SendMessage(_clientSocket, historyResponse);
+                    break;
 
                 default:
                     SendResponse(message.Command, "Comando desconocido");

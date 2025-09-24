@@ -738,4 +738,99 @@ public class ClassService
             );
         }
     }
+    
+    public ProtocolMessage HandleSearchClasses(string data)
+    {
+        try
+        {
+            var parts = data.Split('|');
+            string keyword = parts.Length > 0 ? parts[0] : "";
+            string minDateStr = parts.Length > 1 ? parts[1] : "";
+            string maxDateStr = parts.Length > 2 ? parts[2] : "";
+            string maxDurStr = parts.Length > 3 ? parts[3] : "";
+
+            DateTime? minDate = DateTime.TryParse(minDateStr, out var d1) ? d1 : null;
+            DateTime? maxDate = DateTime.TryParse(maxDateStr, out var d2) ? d2 : null;
+            int? maxDuration = int.TryParse(maxDurStr, out var dur) ? dur : null;
+
+            //  usar Values para obtener directamente los objetos ClassSession
+            var filtered = _classes.Values.Where(c =>
+                (string.IsNullOrEmpty(keyword) ||
+                 c.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                 c.Description.Contains(keyword, StringComparison.OrdinalIgnoreCase)) &&
+                (!minDate.HasValue || c.StartDateTime.Date >= minDate.Value.Date) &&
+                (!maxDate.HasValue || c.StartDateTime.Date <= maxDate.Value.Date) &&
+                (!maxDuration.HasValue || c.DurationMinutes <= maxDuration.Value)
+            );
+
+            var sb = new StringBuilder();
+            foreach (var c in filtered)
+            {
+                string hasImage = string.IsNullOrEmpty(c.ImagePath) ? "No" : "Sí";
+                int enrolled = c.EnrolledCount;
+                sb.AppendLine($"{c.Id} | {c.Name} | {c.Description} | " +
+                              $"{c.StartDateTime:yyyy-MM-dd HH:mm} | {c.DurationMinutes} min | " +
+                              $"Cupos: {enrolled}/{c.MaxSeats} | Imagen: {hasImage}");
+            }
+
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_SEARCH_CLASSES,
+                sb.Length > 0 ? sb.ToString() : "No se encontraron clases con esos filtros."
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                $"Error al buscar clases: {ex.Message}"
+            );
+        }
+    }
+    
+    public ProtocolMessage HandleHistory(Guid clientId)
+    {
+        if (!UserService.Instance.IsUserLoggedIn(clientId))
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                "Debes iniciar sesión primero."
+            );
+        }
+
+        var username = UserService.Instance.GetLoggedInUsername(clientId);
+        if (string.IsNullOrEmpty(username))
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                "No se pudo obtener el usuario actual."
+            );
+        }
+
+        var sb = new StringBuilder();
+        foreach (var c in _classes.Values)
+        {
+            foreach (var e in c.Enrollments.Where(e => e.Username == username))
+            {
+                string estado;
+                if (e.IsCancelled) estado = "Cancelada";
+                else if (c.StartDateTime < DateTime.Now) estado = "Finalizada";
+                else estado = "Activa";
+
+                sb.AppendLine($"{c.Id} | {c.Name} | {c.StartDateTime:yyyy-MM-dd HH:mm} | Estado: {estado}");
+            }
+        }
+
+        return new ProtocolMessage(
+            ProtocolConstants.HEADER_RESPONSE,
+            ProtocolConstants.CMD_HISTORY,
+            sb.Length > 0 ? sb.ToString() : "No tienes inscripciones registradas."
+        );
+    }
+
+
+
 }

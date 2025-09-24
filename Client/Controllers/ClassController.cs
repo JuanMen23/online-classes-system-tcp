@@ -293,4 +293,34 @@ public class ClassController
             _menuManager.ShowError($"Error al eliminar la clase: {ex.Message}");
         }
     }
+    
+    public void SearchClasses(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        var data = _menuManager.PromptSearchClasses();
+        if (data == null) return; // el usuario canceló
+
+        var request = new ProtocolMessage(
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_SEARCH_CLASSES,
+            data
+        );
+
+        setWaitingForResponse(true);
+        socketService.SendMessage(request);
+        _menuManager.ShowInfo("Solicitud de búsqueda enviada.");
+    }
+    
+    public void RequestHistory(SocketService socketService, Action<bool> setWaitingForResponse)
+    {
+        var request = new ProtocolMessage(
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_HISTORY,
+            ""
+        );
+
+        setWaitingForResponse(true);
+        socketService.SendMessage(request);
+        Console.WriteLine("Solicitud de historial enviada.");
+    }
+
 }

@@ -30,7 +30,9 @@ public class MenuManager
         Console.WriteLine("4. Ver clases disponibles");
         Console.WriteLine("5. Inscribirse en clase");
         Console.WriteLine("6. Cancelar inscripción");
-        Console.WriteLine("7. Cerrar Sesión (Logout)");
+        Console.WriteLine("7. Buscar/filtrar clases");
+        Console.WriteLine("8. Ver historial de actividades");
+        Console.WriteLine("9. Cerrar Sesión (Logout)");
         Console.Write("\n > Seleccione una opción: ");
     }
 
@@ -252,6 +254,60 @@ public class MenuManager
     {
         Console.Write("Ingrese el ID de la clase que desea eliminar: ");
         return Console.ReadLine() ?? "";
+    }
+
+    /// <summary>
+    /// Prompts for search/filter options and returns the formatted data string
+    /// </summary>
+    /// <returns>Formatted string for protocol (keyword|minDate|maxDate|maxDuration) or null if cancelled</returns>
+    public string? PromptSearchClasses()
+    {
+        Console.WriteLine("=== Buscar/Filtrar Clases ===");
+        Console.WriteLine("1. Buscar por palabra clave");
+        Console.WriteLine("2. Filtrar por fecha mínima");
+        Console.WriteLine("3. Filtrar por fecha máxima");
+        Console.WriteLine("4. Filtrar por duración máxima");
+        Console.WriteLine("0. Volver al menú principal");
+        Console.Write("Seleccione una opción: ");
+        string? choice = Console.ReadLine();
+
+        string data = "";
+
+        switch (choice)
+        {
+            case "1":
+                Console.Write("Ingrese palabra clave: ");
+                var keyword = Console.ReadLine() ?? "";
+                data = $"{keyword}|||"; // keyword|minDate|maxDate|maxDuration
+                break;
+
+            case "2":
+                Console.Write("Ingrese fecha mínima (yyyy-MM-dd): ");
+                var minDate = Console.ReadLine();
+                data = $"|{minDate}||"; // keyword vacío
+                break;
+
+            case "3":
+                Console.Write("Ingrese fecha máxima (yyyy-MM-dd): ");
+                var maxDate = Console.ReadLine();
+                data = $"||{maxDate}|"; // keyword y minDate vacíos
+                break;
+
+            case "4":
+                Console.Write("Ingrese duración máxima (minutos): ");
+                var duration = Console.ReadLine();
+                data = $"|||{duration}";
+                break;
+
+            case "0":
+                return null;
+
+            default:
+                Console.WriteLine("⚠️ Opción inválida.");
+                return null;
+        }
+
+        return data;
     }
 
     /// <summary>
