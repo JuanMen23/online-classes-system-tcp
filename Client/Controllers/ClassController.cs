@@ -296,50 +296,8 @@ public class ClassController
     
     public void SearchClasses(SocketService socketService, Action<bool> setWaitingForResponse)
     {
-        Console.WriteLine("=== Buscar/Filtrar Clases ===");
-        Console.WriteLine("1. Buscar por palabra clave");
-        Console.WriteLine("2. Filtrar por fecha mínima");
-        Console.WriteLine("3. Filtrar por fecha máxima");
-        Console.WriteLine("4. Filtrar por duración máxima");
-        Console.WriteLine("0. Volver al menú principal");
-        Console.Write("Seleccione una opción: ");
-        string? choice = Console.ReadLine();
-
-        string data = "";
-
-        switch (choice)
-        {
-            case "1":
-                Console.Write("Ingrese palabra clave: ");
-                data = Console.ReadLine() ?? "";
-                data = $"{data}|||"; // keyword|minDate|maxDate|maxDuration
-                break;
-
-            case "2":
-                Console.Write("Ingrese fecha mínima (yyyy-MM-dd): ");
-                var minDate = Console.ReadLine();
-                data = $"|{minDate}||"; // keyword vacío
-                break;
-
-            case "3":
-                Console.Write("Ingrese fecha máxima (yyyy-MM-dd): ");
-                var maxDate = Console.ReadLine();
-                data = $"||{maxDate}|"; // keyword y minDate vacíos
-                break;
-
-            case "4":
-                Console.Write("Ingrese duración máxima (minutos): ");
-                var duration = Console.ReadLine();
-                data = $"|||{duration}";
-                break;
-
-            case "0":
-                return;
-
-            default:
-                Console.WriteLine("Opción inválida.");
-                return;
-        }
+        var data = _menuManager.PromptSearchClasses();
+        if (data == null) return; // el usuario canceló
 
         var request = new ProtocolMessage(
             ProtocolConstants.HEADER_REQUEST,
@@ -349,7 +307,7 @@ public class ClassController
 
         setWaitingForResponse(true);
         socketService.SendMessage(request);
-        Console.WriteLine("Solicitud de búsqueda enviada.");
+        _menuManager.ShowInfo("Solicitud de búsqueda enviada.");
     }
     
     public void RequestHistory(SocketService socketService, Action<bool> setWaitingForResponse)
