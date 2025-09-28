@@ -66,6 +66,10 @@ public class ResponseHandler
             case ProtocolConstants.CMD_ERROR:
                 HandleErrorResponse(response);
                 break;
+            
+            case ProtocolConstants.CMD_DOWNLOAD_IMAGE:
+                HandleDownloadImageResponse(response);
+                break;
 
             default:
                 HandleUnknownResponse(response);
@@ -256,5 +260,34 @@ public class ResponseHandler
     {
         _menuManager.ShowConnectionStatus("Se perdió la conexión con el servidor. Presione ENTER para salir.");
         _authManager.SetLoggedOut();
+    }
+    
+    /// <summary>
+    /// Handles Image Download
+    /// </summary>
+    private void HandleDownloadImageResponse(ProtocolMessage response)
+    {
+        try
+        {
+            byte[] imageBytes = Convert.FromBase64String(response.Data);
+
+            string downloadsPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            downloadsPath = Path.Combine(downloadsPath, "Downloads");
+
+            string fileName = $"clase_imagen_{Guid.NewGuid()}.png";
+            string fullPath = Path.Combine(downloadsPath, fileName);
+
+            File.WriteAllBytes(fullPath, imageBytes);
+
+            _menuManager.ShowSuccess($"Imagen descargada exitosamente en: {fullPath}");
+        }
+        catch (FormatException)
+        {
+            _menuManager.ShowError($"El servidor no envió una imagen válida. Respuesta: {response.Data}");
+        }
+        catch (Exception ex)
+        {
+            _menuManager.ShowError($"Error al guardar la imagen: {ex.Message}");
+        }
     }
 }

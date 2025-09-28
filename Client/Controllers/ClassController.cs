@@ -23,56 +23,56 @@ public class ClassController
     /// <param name="socketService">Socket service for sending messages</param>
     /// <param name="setWaitingForResponse">Callback to set waiting state</param>
     public void CreateClass(SocketService socketService, Action<bool> setWaitingForResponse)
+{
+    try
     {
-        try
+        var (name, description, maxSeats, duration, startDateTime, imagePath) = _menuManager.PromptClassCreation();
+        
+        if (!_inputValidator.ValidateClassData(name, description, maxSeats, duration))
         {
-            var (name, description, maxSeats, duration, startDateTime, imagePath) = _menuManager.PromptClassCreation();
-
-            if (!_inputValidator.ValidateClassData(name, description, maxSeats, duration))
+            _menuManager.ShowError("Datos de clase inválidos. Intente nuevamente.");
+            return;
+        }
+        
+        string imageBase64 = ""; 
+        if (!string.IsNullOrEmpty(imagePath))
+        {
+            try
             {
-                _menuManager.ShowError("Datos de clase inválidos. Intente nuevamente.");
-                return;
-            }
-            string imageBase64 = "";
-            if (!string.IsNullOrEmpty(imagePath))
-            {
-                try
+                string extension = Path.GetExtension(imagePath).ToLower();
+                if (extension != ".jpg" && extension != ".jpeg" && extension != ".png")
                 {
-                    // -- File type validation --
-                    string extension = Path.GetExtension(imagePath).ToLower();
-                    if (extension != ".jpg" && extension != ".jpeg" && extension != ".png")
-                    {
-                        _menuManager.ShowError("El archivo debe ser una imagen (.jpg, .jpeg, .png).");
-                        return;
-                    }
-                    
-                    imageBase64 = _inputValidator.ReadImageFile(imagePath);
-                    _menuManager.ShowSuccess("Imagen procesada exitosamente.");
-                }
-                catch (InvalidOperationException ex)
-                {
-                    _menuManager.ShowError(ex.Message);
+                    _menuManager.ShowError("El archivo debe ser una imagen (.jpg, .jpeg, .png).");
                     return;
                 }
+                
+                imageBase64 = _inputValidator.ReadImageFile(imagePath);
+                _menuManager.ShowSuccess("Imagen procesada exitosamente.");
             }
-
-            string data = _inputValidator.FormatClassData(name, description, maxSeats, startDateTime, duration, imageBase64);
-
-            var request = new ProtocolMessage(
-                ProtocolConstants.HEADER_REQUEST,
-                ProtocolConstants.CMD_CREATE_CLASS,
-                data
-            );
-
-            setWaitingForResponse(true);
-            socketService.SendMessage(request);
-            _menuManager.ShowInfo("Solicitud de creación de clase enviada.");
+            catch (InvalidOperationException ex)
+            {
+                _menuManager.ShowError(ex.Message);
+                return;
+            }
         }
-        catch (Exception ex)
-        {
-            _menuManager.ShowError($"Error al crear clase: {ex.Message}");
-        }
+        
+        string data = _inputValidator.FormatClassData(name, description, maxSeats, startDateTime, duration, imageBase64);
+
+        var request = new ProtocolMessage(
+            ProtocolConstants.HEADER_REQUEST,
+            ProtocolConstants.CMD_CREATE_CLASS,
+            data
+        );
+
+        setWaitingForResponse(true);
+        socketService.SendMessage(request);
+        _menuManager.ShowInfo("Solicitud de creación de clase enviada.");
     }
+    catch (Exception ex)
+    {
+        _menuManager.ShowError($"Error al crear clase: {ex.Message}");
+    }
+}
 
     /// <summary>
     /// Handles class list request
@@ -330,5 +330,23 @@ public class ClassController
         socketService.SendMessage(request);
         Console.WriteLine("Solicitud de historial enviada.");
     }
+    public void DownloadImage(SocketService socketService, Action<bool> setWaitingForResponse, string classId)
+    {
+        try
+        {
+            var request = new ProtocolMessage(
+                ProtocolConstants.HEADER_REQUEST,
+                ProtocolConstants.CMD_DOWNLOAD_IMAGE,
+                classId
+            );
 
+            setWaitingForResponse(true);
+            socketService.SendMessage(request);
+            _menuManager.ShowInfo($"Solicitando imagen para la clase {classId}...");
+        }
+        catch (Exception ex)
+        {
+            _menuManager.ShowError($"Error al solicitar la imagen: {ex.Message}");
+        }
+    }
 }

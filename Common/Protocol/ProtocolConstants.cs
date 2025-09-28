@@ -34,6 +34,7 @@ public static class ProtocolConstants
     public const int CMD_DELETE_CLASS = 12;     // Eliminar clase (CR5)
     public const int CMD_LIST_CLASSES = 13;     // Ver todas las clases (CR6)
     public const int CMD_SEARCH_CLASSES = 14;   // Buscar/filtrar clases (CR7)
+    public const int CMD_DOWNLOAD_IMAGE = 16;   // Descargar imagen de una clase
 
     // ========================
     // Enrollment Commands
