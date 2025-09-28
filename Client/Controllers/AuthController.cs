@@ -1,5 +1,6 @@
 using Common.Protocol;
 using Client.Services;
+using Common;
 
 namespace Client.Controllers;
 
@@ -47,7 +48,7 @@ public class AuthController
 
             if (!_inputValidator.ValidateCredentials(username, password))
             {
-                _menuManager.ShowError("El usuario y la contraseña no pueden estar vacíos.");
+                PrintMessage.Error("El usuario y la contraseña no pueden estar vacíos.");
                 return;
             }
 
@@ -60,11 +61,11 @@ public class AuthController
 
             setWaitingForResponse(true);
             socketService.SendMessage(message);
-            _menuManager.ShowInfo("Enviando datos de registro...");
+            PrintMessage.Information("Enviando datos de registro...");
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error durante el registro: {ex.Message}");
+            PrintMessage.Error($"Error durante el registro: {ex.Message}");
         }
     }
 
@@ -81,7 +82,7 @@ public class AuthController
 
             if (!_inputValidator.ValidateCredentials(username, password))
             {
-                _menuManager.ShowError("El usuario y la contraseña no pueden estar vacíos.");
+                PrintMessage.Error("El usuario y la contraseña no pueden estar vacíos.");
                 return;
             }
 
@@ -95,11 +96,11 @@ public class AuthController
 
             setWaitingForResponse(true);
             socketService.SendMessage(message);
-            _menuManager.ShowInfo("Iniciando sesión...");
+            PrintMessage.Information("Iniciando sesión...");
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error durante el login: {ex.Message}");
+            PrintMessage.Error($"Error durante el login: {ex.Message}");
         }
     }
 
@@ -120,11 +121,11 @@ public class AuthController
 
             setWaitingForResponse(true);
             socketService.SendMessage(message);
-            _menuManager.ShowInfo("Cerrando sesión...");
+            PrintMessage.Information("Cerrando sesión...");
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error durante el logout: {ex.Message}");
+            PrintMessage.Error($"Error durante el logout: {ex.Message}");
         }
     }
 

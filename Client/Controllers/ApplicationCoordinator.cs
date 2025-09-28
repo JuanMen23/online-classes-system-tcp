@@ -1,5 +1,6 @@
 using Common.Protocol;
 using Client.Services;
+using Common;
 
 namespace Client.Controllers;
 
@@ -57,7 +58,7 @@ public class ApplicationCoordinator
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error al iniciar el cliente: {ex.Message}");
+            PrintMessage.Error($"Error al iniciar el cliente: {ex.Message}");
         }
         finally
         {
@@ -111,7 +112,7 @@ public class ApplicationCoordinator
                 _isRunning = false; 
                 break;
             default: 
-                _menuManager.ShowError("Opción no válida."); 
+                PrintMessage.Error("Opción no válida."); 
                 break;
         }
     }
@@ -138,7 +139,7 @@ public class ApplicationCoordinator
             }
             else
             {
-                _menuManager.ShowError("Comando incompleto. Uso correcto: descargar + ID de clase");
+                PrintMessage.Error("Comando incompleto. Uso correcto: descargar + ID de clase");
             }
             return;
         }
@@ -173,7 +174,7 @@ public class ApplicationCoordinator
                 _authController.HandleLogout(_socketService, SetWaitingForResponse);
                 break;
             default:
-                _menuManager.ShowError("Opción no válida.");
+                PrintMessage.Error("Opción no válida.");
                 break;
         }
     }

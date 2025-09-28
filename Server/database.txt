@@ -1,0 +1,7 @@
+USER|romi|val
+USER|juan|1234
+USER|ana|abcd
+CLASS|1|Historia|Historia Edad Media|2|2026-10-01 00:00|120|Images/historia.png|romi|juan
+CLASS|2|Algebra|Algebra Lineal Avanzada|15|2026-11-15 18:30|90||romi|
+CLASS|3|Programacion I|Introduccion a C#|20|2026-10-05 09:00|180|Images/programacion.png|ana|
+CLASS|4|Redes|Conceptos de Redes TCP/IP|10|2026-12-01 14:00|120||juan,ana
