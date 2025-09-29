@@ -891,7 +891,18 @@ public class ClassService
         }
         
         // 3. Read the file and convert it to Base64
-        byte[]? imageBytes = ReadEmbeddedResource(targetClass.ImagePath);
+        byte[]? imageBytes = null;
+        
+        // Try to read as embedded resource first (for old images)
+        if (targetClass.ImagePath.StartsWith("Server.Images."))
+        {
+            imageBytes = ReadEmbeddedResource(targetClass.ImagePath);
+        }
+        // Try to read as file path (for new images)
+        else if (File.Exists(targetClass.ImagePath))
+        {
+            imageBytes = File.ReadAllBytes(targetClass.ImagePath);
+        }
 
         if (imageBytes == null)
         {
