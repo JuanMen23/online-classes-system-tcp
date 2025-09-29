@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace Server.Services;
 
 using Server.Data;
@@ -887,15 +889,14 @@ public class ClassService
         {
             throw new InvalidOperationException("Esta clase no tiene una imagen asociada.");
         }
+        
+        // 3. Read the file and convert it to Base64
+        byte[]? imageBytes = ReadEmbeddedResource(targetClass.ImagePath);
 
-        // 3. Verify if the image exists on the server
-        if (!File.Exists(targetClass.ImagePath))
+        if (imageBytes == null)
         {
-            throw new FileNotFoundException("El archivo de la imagen no se encontró en el servidor.");
+            throw new FileNotFoundException($"El archivo de la imagen '{targetClass.ImagePath}' no se encontró en el servidor.");
         }
-
-        // 4. Read the file and convert it to Base64
-        byte[] imageBytes = File.ReadAllBytes(targetClass.ImagePath);
         return Convert.ToBase64String(imageBytes);
     }
     
@@ -930,6 +931,21 @@ public class ClassService
         lock (_lockNextId)
         {
             _nextId = id;
+        }
+    }
+    
+    private byte[]? ReadEmbeddedResource(string resourceName)
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        using (Stream? stream = assembly.GetManifestResourceStream(resourceName))
+        {
+            if (stream == null) return null;
+
+            using (var memoryStream = new MemoryStream())
+            {
+                stream.CopyTo(memoryStream);
+                return memoryStream.ToArray();
+            }
         }
     }
 }
