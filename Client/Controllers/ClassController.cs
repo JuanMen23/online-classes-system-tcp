@@ -1,5 +1,6 @@
 using Common.Protocol;
 using Client.Services;
+using Common;
 
 namespace Client.Controllers;
 
@@ -30,7 +31,7 @@ public class ClassController
         
         if (!_inputValidator.ValidateClassData(name, description, maxSeats, duration))
         {
-            _menuManager.ShowError("Datos de clase inválidos. Intente nuevamente.");
+            PrintMessage.Error("Datos de clase inválidos. Intente nuevamente.");
             return;
         }
         
@@ -42,16 +43,16 @@ public class ClassController
                 string extension = Path.GetExtension(imagePath).ToLower();
                 if (extension != ".jpg" && extension != ".jpeg" && extension != ".png")
                 {
-                    _menuManager.ShowError("El archivo debe ser una imagen (.jpg, .jpeg, .png).");
+                    PrintMessage.Error("El archivo debe ser una imagen (.jpg, .jpeg, .png).");
                     return;
                 }
                 
                 imageBase64 = _inputValidator.ReadImageFile(imagePath);
-                _menuManager.ShowSuccess("Imagen procesada exitosamente.");
+                PrintMessage.Success("Imagen procesada exitosamente.");
             }
             catch (InvalidOperationException ex)
             {
-                _menuManager.ShowError(ex.Message);
+                PrintMessage.Error(ex.Message);
                 return;
             }
         }
@@ -66,11 +67,11 @@ public class ClassController
 
         setWaitingForResponse(true);
         socketService.SendMessage(request);
-        _menuManager.ShowInfo("Solicitud de creación de clase enviada.");
+        PrintMessage.Information("Solicitud de creación de clase enviada.");
     }
     catch (Exception ex)
     {
-        _menuManager.ShowError($"Error al crear clase: {ex.Message}");
+        PrintMessage.Error($"Error al crear clase: {ex.Message}");
     }
 }
 
@@ -91,11 +92,11 @@ public class ClassController
 
             setWaitingForResponse(true);
             socketService.SendMessage(request);
-            _menuManager.ShowInfo("Solicitud de listado de clases enviada.");
+            PrintMessage.Information("Solicitud de listado de clases enviada.");
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error al solicitar lista de clases: {ex.Message}");
+            PrintMessage.Error($"Error al solicitar lista de clases: {ex.Message}");
         }
     }
 
@@ -151,7 +152,7 @@ public class ClassController
 
             if (string.IsNullOrEmpty(classId))
             {
-                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                PrintMessage.Error("ID de clase no puede estar vacío.");
                 return;
             }
 
@@ -163,11 +164,11 @@ public class ClassController
 
             setWaitingForResponse(true);
             socketService.SendMessage(request);
-            _menuManager.ShowInfo("Solicitud de inscripción enviada.");
+            PrintMessage.Information("Solicitud de inscripción enviada.");
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error al inscribirse en la clase: {ex.Message}");
+            PrintMessage.Error($"Error al inscribirse en la clase: {ex.Message}");
         }
     }
 
@@ -184,7 +185,7 @@ public class ClassController
 
             if (string.IsNullOrEmpty(classId))
             {
-                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                PrintMessage.Error("ID de clase no puede estar vacío.");
                 return;
             }
 
@@ -196,11 +197,11 @@ public class ClassController
 
             setWaitingForResponse(true);
             socketService.SendMessage(request);
-            _menuManager.ShowInfo("Solicitud de cancelación de inscripción enviada.");
+            PrintMessage.Information("Solicitud de cancelación de inscripción enviada.");
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error al cancelar la inscripción: {ex.Message}");
+            PrintMessage.Error($"Error al cancelar la inscripción: {ex.Message}");
         }
     }
 
@@ -217,13 +218,13 @@ public class ClassController
 
             if (string.IsNullOrEmpty(classId))
             {
-                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                PrintMessage.Error("ID de clase no puede estar vacío.");
                 return;
             }
 
             if (!_inputValidator.ValidateClassData(name, description, maxSeats, duration))
             {
-                _menuManager.ShowError("Datos de clase inválidos. Intente nuevamente.");
+                PrintMessage.Error("Datos de clase inválidos. Intente nuevamente.");
                 return;
             }
 
@@ -236,7 +237,7 @@ public class ClassController
                 }
                 catch (InvalidOperationException ex)
                 {
-                    _menuManager.ShowError(ex.Message);
+                    PrintMessage.Error(ex.Message);
                     return;
                 }
             }
@@ -251,11 +252,11 @@ public class ClassController
 
             setWaitingForResponse(true);
             socketService.SendMessage(request);
-            _menuManager.ShowInfo("Solicitud de modificación de clase enviada.");
+            PrintMessage.Information("Solicitud de modificación de clase enviada.");
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error al modificar la clase: {ex.Message}");
+            PrintMessage.Error($"Error al modificar la clase: {ex.Message}");
         }
     }
 
@@ -272,7 +273,7 @@ public class ClassController
 
             if (string.IsNullOrEmpty(classId))
             {
-                _menuManager.ShowError("ID de clase no puede estar vacío.");
+                PrintMessage.Error("ID de clase no puede estar vacío.");
                 return;
             }
 
@@ -282,7 +283,7 @@ public class ClassController
             
             if (confirmation != "s" && confirmation != "sí" && confirmation != "si")
             {
-                _menuManager.ShowInfo("Operación cancelada.");
+                PrintMessage.Information("Operación cancelada.");
                 return;
             }
 
@@ -294,11 +295,11 @@ public class ClassController
 
             setWaitingForResponse(true);
             socketService.SendMessage(request);
-            _menuManager.ShowInfo("Solicitud de eliminación de clase enviada.");
+            PrintMessage.Information("Solicitud de eliminación de clase enviada.");
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error al eliminar la clase: {ex.Message}");
+            PrintMessage.Error($"Error al eliminar la clase: {ex.Message}");
         }
     }
     
@@ -315,7 +316,7 @@ public class ClassController
 
         setWaitingForResponse(true);
         socketService.SendMessage(request);
-        _menuManager.ShowInfo("Solicitud de búsqueda enviada.");
+        PrintMessage.Information("Solicitud de búsqueda enviada.");
     }
     
     public void RequestHistory(SocketService socketService, Action<bool> setWaitingForResponse)
@@ -328,7 +329,7 @@ public class ClassController
 
         setWaitingForResponse(true);
         socketService.SendMessage(request);
-        Console.WriteLine("Solicitud de historial enviada.");
+        PrintMessage.Information("Solicitud de historial enviada.");
     }
     public void DownloadImage(SocketService socketService, Action<bool> setWaitingForResponse, string classId)
     {
@@ -342,11 +343,11 @@ public class ClassController
 
             setWaitingForResponse(true);
             socketService.SendMessage(request);
-            _menuManager.ShowInfo($"Solicitando imagen para la clase {classId}...");
+            PrintMessage.Information($"Solicitando imagen para la clase {classId}...");
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error al solicitar la imagen: {ex.Message}");
+            PrintMessage.Error($"Error al solicitar la imagen: {ex.Message}");
         }
     }
 }

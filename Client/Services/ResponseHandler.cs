@@ -1,3 +1,4 @@
+using Common;
 using Common.Protocol;
 using Common.Config;
 
@@ -87,11 +88,11 @@ public class ResponseHandler
     {
         if (response.Data == ProtocolConstants.RESPONSE_OK)
         {
-            _menuManager.ShowSuccess("¡Registro exitoso! Ahora puedes iniciar sesión.");
+            PrintMessage.Success("¡Registro exitoso! Ahora puedes iniciar sesión.");
         }
         else
         {
-            _menuManager.ShowError($"Error de registro: {response.Data}");
+            PrintMessage.Error($"Error de registro: {response.Data}");
         }
     }
 
@@ -104,12 +105,12 @@ public class ResponseHandler
         if (response.Data == ProtocolConstants.RESPONSE_OK)
         {
             _authManager.SetLoggedIn(_authManager.CurrentUser ?? "");
-            _menuManager.ShowSuccess($"¡Bienvenido, {_authManager.CurrentUser}!");
+            PrintMessage.Success($"¡Bienvenido, {_authManager.CurrentUser}!");
         }
         else
         {
             _authManager.ClearCurrentUser();
-            _menuManager.ShowError($"Error de inicio de sesión: {response.Data}");
+            PrintMessage.Error($"Error de inicio de sesión: {response.Data}");
         }
     }
 
@@ -120,7 +121,7 @@ public class ResponseHandler
     private void HandleLogoutResponse(ProtocolMessage response)
     {
         _authManager.SetLoggedOut();
-        _menuManager.ShowInfo("Sesión cerrada correctamente.");
+        PrintMessage.Information("Sesión cerrada correctamente.");
     }
 
     /// <summary>
@@ -134,18 +135,18 @@ public class ResponseHandler
             var parts = response.Data.Split('|');
             if (parts.Length >= 3)
             {
-                _menuManager.ShowSuccess("¡Clase creada exitosamente!");
+                PrintMessage.Success("¡Clase creada exitosamente!");
                 Console.WriteLine($"   ID: {parts[1]}");
                 Console.WriteLine($"   Link: {parts[2]}");
             }
             else
             {
-                _menuManager.ShowSuccess("¡Clase creada exitosamente!");
+                PrintMessage.Success("¡Clase creada exitosamente!");
             }
         }
         else
         {
-            _menuManager.ShowError($"Error al crear clase: {response.Data}");
+            PrintMessage.Error($"Error al crear clase: {response.Data}");
         }
     }
 
@@ -157,11 +158,11 @@ public class ResponseHandler
     {
         if (response.Data.StartsWith("OK|"))
         {
-            _menuManager.ShowSuccess(response.Data.Substring(3)); // Mostrar el mensaje después de "OK|"
+            PrintMessage.Success(response.Data.Substring(3)); // Mostrar el mensaje después de "OK|"
         }
         else
         {
-            _menuManager.ShowError($"Error al modificar clase: {response.Data}");
+            PrintMessage.Error($"Error al modificar clase: {response.Data}");
         }
     }
 
@@ -173,11 +174,11 @@ public class ResponseHandler
     {
         if (response.Data.StartsWith("OK|"))
         {
-            _menuManager.ShowSuccess(response.Data.Substring(3)); // Mostrar el mensaje después de "OK|"
+            PrintMessage.Success(response.Data.Substring(3)); // Mostrar el mensaje después de "OK|"
         }
         else
         {
-            _menuManager.ShowError($"Error al eliminar clase: {response.Data}");
+            PrintMessage.Error($"Error al eliminar clase: {response.Data}");
         }
     }
 
@@ -200,11 +201,11 @@ public class ResponseHandler
         {
             var parts = response.Data.Split('|');
             var message = parts.Length > 1 ? parts[1] : "Inscripción exitosa";
-            _menuManager.ShowSuccess(message);
+            PrintMessage.Success(message);
         }
         else
         {
-            _menuManager.ShowError($"Error en la inscripción: {response.Data}");
+            PrintMessage.Error($"Error en la inscripción: {response.Data}");
         }
     }
 
@@ -218,11 +219,11 @@ public class ResponseHandler
         {
             var parts = response.Data.Split('|');
             var message = parts.Length > 1 ? parts[1] : "Cancelación de inscripción exitosa";
-            _menuManager.ShowSuccess(message);
+            PrintMessage.Success(message);
         }
         else
         {
-            _menuManager.ShowError($"Error al cancelar la inscripción: {response.Data}");
+            PrintMessage.Error($"Error al cancelar la inscripción: {response.Data}");
         }
     }
 
@@ -232,7 +233,7 @@ public class ResponseHandler
     /// <param name="response">Error response message</param>
     private void HandleErrorResponse(ProtocolMessage response)
     {
-        _menuManager.ShowError($"Error: {response.Data}");
+        PrintMessage.Error($"Error: {response.Data}");
     }
 
     /// <summary>
@@ -279,15 +280,15 @@ public class ResponseHandler
 
             File.WriteAllBytes(fullPath, imageBytes);
 
-            _menuManager.ShowSuccess($"Imagen descargada exitosamente en: {fullPath}");
+            PrintMessage.Success($"Imagen descargada exitosamente en: {fullPath}");
         }
         catch (FormatException)
         {
-            _menuManager.ShowError($"El servidor no envió una imagen válida. Respuesta: {response.Data}");
+            PrintMessage.Error($"El servidor no envió una imagen válida. Respuesta: {response.Data}");
         }
         catch (Exception ex)
         {
-            _menuManager.ShowError($"Error al guardar la imagen: {ex.Message}");
+            PrintMessage.Error($"Error al guardar la imagen: {ex.Message}");
         }
     }
 }

@@ -863,4 +863,38 @@ public class ClassService
         byte[] imageBytes = File.ReadAllBytes(targetClass.ImagePath);
         return Convert.ToBase64String(imageBytes);
     }
+    
+    public void CreateClassFromData(
+        int id, string name, string description, int maxSeats, DateTime startDateTime, 
+        int durationMinutes, string? imagePath, string createdBy, List<string> enrolledUsers
+        )
+    {
+        var newClass = new ClassSession
+        {
+            Id = id,
+            Name = name,
+            Description = description,
+            MaxSeats = maxSeats,
+            StartDateTime = startDateTime,
+            DurationMinutes = durationMinutes,
+            ImagePath = imagePath,
+            CreatedBy = createdBy,
+            Link = $"class-{Guid.NewGuid()}"
+        };
+    
+        foreach(var user in enrolledUsers)
+        {
+            newClass.EnrollUser(user);
+        }
+
+        _classes.TryAdd(id, newClass);
+    }
+    
+    public void SetNextId(int id)
+    {
+        lock (_lockNextId)
+        {
+            _nextId = id;
+        }
+    }
 }

@@ -1,3 +1,5 @@
+using Common;
+
 namespace Client.Services;
 
 /// <summary>
@@ -162,39 +164,6 @@ public class MenuManager
     }
 
     /// <summary>
-    /// Shows a success message
-    /// </summary>
-    /// <param name="message">Success message to display</param>
-    public void ShowSuccess(string message)
-    {
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"✅ {message}");
-        Console.ResetColor();
-    }
-
-    /// <summary>
-    /// Shows an error message
-    /// </summary>
-    /// <param name="message">Error message to display</param>
-    public void ShowError(string message)
-    {
-        Console.ForegroundColor = ConsoleColor.DarkRed;
-        Console.WriteLine($"⚠️ {message}");
-        Console.ResetColor();
-    }
-
-    /// <summary>
-    /// Shows an informational message
-    /// </summary>
-    /// <param name="message">Message to display</param>
-    public void ShowInfo(string message)
-    {
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"\n-> {message}");
-        Console.ResetColor();
-    }
-
-    /// <summary>
     /// Shows connection status messages
     /// </summary>
     /// <param name="message">Connection message to display</param>
@@ -248,7 +217,7 @@ public class MenuManager
             string input = Console.ReadLine() ?? "";
             if (int.TryParse(input, out maxSeats) && maxSeats > 0)
                 break;
-            ShowError("Ingrese un número válido mayor a 0.");
+            PrintMessage.Error("Ingrese un número válido mayor a 0.");
         }
 
         // Duración
@@ -259,7 +228,7 @@ public class MenuManager
             string input = Console.ReadLine() ?? "";
             if (int.TryParse(input, out duration) && duration > 0)
                 break;
-            ShowError("Ingrese un número válido mayor a 0.");
+            PrintMessage.Error("Ingrese un número válido mayor a 0.");
         }
 
         // Fecha
@@ -271,7 +240,7 @@ public class MenuManager
             if (DateTime.TryParse(input, out startDateTime))
                 break;
 
-            ShowError("Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
+            PrintMessage.Error("Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
         }
 
         // Imagen
@@ -338,7 +307,7 @@ public class MenuManager
                 return null;
 
             default:
-                ShowError("Opción inválida.");
+                PrintMessage.Error("Opción inválida.");
                 return null;
         }
 
