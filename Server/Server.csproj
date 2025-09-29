@@ -15,9 +15,7 @@
     <None Update="database.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="App.config">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <None Update="App.config" />
   </ItemGroup>
 
   <ItemGroup>
