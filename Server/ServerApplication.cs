@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Sockets;
 using Common;
 using Common.Config;
@@ -160,10 +159,12 @@ public class ServerApplication
         _serverSocket.Bind(localEndpoint);
         _serverSocket.Listen(_config.MaxBacklogConnections);
     }
-
-    private void LoadDataFromFile(string filePath = "database.txt") 
-    {
     
+    private void LoadDataFromFile(string fileName = "database.txt")
+    {
+        string exePath = AppContext.BaseDirectory;
+        string filePath = Path.Combine(exePath, fileName);
+        
         if (!File.Exists(filePath))
         {
             PrintMessage.Information($"Advertencia: No se encontró el archivo de datos ({filePath}). El servidor iniciará vacío.");
@@ -182,16 +183,19 @@ public class ServerApplication
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
                 var parts = line.Split('|');
-                var type = parts[0]; // Identifier: USER or CLASS
+                if (parts.Length < 2) continue;
+
+                var type = parts[0];
 
                 if (type == "USER" && parts.Length == 3)
                 {
                     var username = parts[1];
                     var password = parts[2];
-                    UserService.Instance.RegisterUser(username, password);
+                    
+                    UserService.Instance.RegisterUser(username, password); 
                     usersLoaded++;
                 }
-                else if (type == "CLASS" && parts.Length == 10)
+                else if (type == "CLASS" && parts.Length >= 9)
                 {
                     var classId = int.Parse(parts[1]);
                     var name = parts[2];
@@ -201,7 +205,12 @@ public class ServerApplication
                     var durationMinutes = int.Parse(parts[6]);
                     var imagePath = string.IsNullOrEmpty(parts[7]) ? null : parts[7];
                     var createdBy = parts[8];
-                    var enrolledUsers = parts[9].Split(',').Where(u => !string.IsNullOrEmpty(u)).ToList();
+                    
+                    var enrolledUsers = new List<string>();
+                    if (parts.Length > 9 && !string.IsNullOrEmpty(parts[9]))
+                    {
+                        enrolledUsers = parts[9].Split(',').Select(u => u.Trim()).ToList();
+                    }
 
                     ClassService.Instance.CreateClassFromData(classId, name, description, maxSeats, startDateTime, durationMinutes, imagePath, createdBy, enrolledUsers);
                     if (classId > maxClassId) maxClassId = classId;
@@ -210,7 +219,6 @@ public class ServerApplication
             }
 
             ClassService.Instance.SetNextId(maxClassId + 1);
-            
             PrintMessage.Success($"Datos cargados desde {filePath}: {usersLoaded} usuarios y {classesLoaded} clases.");
         }
         catch (Exception ex)
