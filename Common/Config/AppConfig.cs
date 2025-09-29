@@ -4,11 +4,12 @@ using Common.Protocol;
 namespace Common.Config;
 
 /// <summary>
-/// Configuration class for application settings
+/// Configuration class for application settings.
+/// Reads from App.config with safe fallbacks.
 /// </summary>
 public class AppConfig
 {
-    private readonly SettingsManager _settings = new SettingsManager();
+    private readonly SettingsManager _settings = new();
     
     /// <summary>
     /// Server IP address
@@ -21,17 +22,36 @@ public class AppConfig
     public int ServerPort { get; set; }
     
     /// <summary>
+    /// Server IP address
+    /// </summary>
+    public string ClientIp { get; set; }
+    
+    /// <summary>
+    /// Server port
+    /// </summary>
+    public int ClientPort { get; set; }
+    
+    /// <summary>
     /// Maximum number of queued connections
     /// </summary>
     public int MaxBacklogConnections { get; set; } = ProtocolConstants.MAX_BACKLOG_CONNECTIONS;
 
     public AppConfig()
     {
-        ServerIp = _settings.ReadSettings("ServerIpAddress") ?? ProtocolConstants.DEFAULT_SERVER_IP;
-        var portStr = _settings.ReadSettings("ServerPort");
-        ServerPort = int.TryParse(portStr, out var parsedPort) 
-            ? parsedPort 
+        ServerIp = _settings.ReadSettings(IpConfig.serverIPconfigKey) 
+                   ?? ProtocolConstants.DEFAULT_SERVER_IP;
+        string? serverPortStr = _settings.ReadSettings(IpConfig.serverPortconfigKey);
+        ServerPort = int.TryParse(serverPortStr, out int parsedServerPort) 
+            ? parsedServerPort 
             : ProtocolConstants.DEFAULT_SERVER_PORT;
+        
+        ClientIp = _settings.ReadSettings(IpConfig.clientIPconfigKey) 
+                   ?? "127.0.0.1";
+        
+        string? clientPortStr = _settings.ReadSettings(IpConfig.clientPortconfigKey);
+        ClientPort = int.TryParse(clientPortStr, out int parsedClientPort) 
+            ? parsedClientPort 
+            : 0;
     }
     
     /// <summary>
@@ -39,7 +59,9 @@ public class AppConfig
     /// </summary>
     public IPEndPoint GetServerEndPoint()
     {
+        Console.WriteLine($"SERVER IP {ServerIp} + SERVER PORT: {ServerPort}");
         return new IPEndPoint(IPAddress.Parse(ServerIp), ServerPort);
+        
     }
     
     /// <summary>
@@ -47,6 +69,7 @@ public class AppConfig
     /// </summary>
     public IPEndPoint GetLocalEndPoint()
     {
-        return new IPEndPoint(IPAddress.Parse("127.0.0.1"), 0); // Port 0 = auto-assign
+        Console.WriteLine($"CLIENT IP {ClientIp} + CLIENT PORT {ClientPort} + SERVER IP {ServerIp} + SERVER PORT: {ServerPort}");
+        return new IPEndPoint(IPAddress.Parse(ClientIp), ClientPort);
     }
 }

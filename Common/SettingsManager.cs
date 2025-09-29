@@ -9,7 +9,7 @@ public class SettingsManager
         try
         {
             var appSettings = ConfigurationManager.AppSettings;
-            return appSettings[key];
+            return appSettings[key] ?? null;
         }
         catch (ConfigurationErrorsException)
         {
