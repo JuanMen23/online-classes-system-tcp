@@ -605,147 +605,182 @@ public class ClassService
     }
 
     public ProtocolMessage HandleDeleteClass(string data, Guid clientId)
+{
+    // Verificar autenticación
+    if (!UserService.Instance.IsUserLoggedIn(clientId))
     {
-        // Verificar autenticación
-        if (!UserService.Instance.IsUserLoggedIn(clientId))
+        return new ProtocolMessage(
+            ProtocolConstants.HEADER_RESPONSE,
+            ProtocolConstants.CMD_ERROR,
+            "Acción no permitida. Debes iniciar sesión primero."
+        );
+    }
+
+    ProtocolMessage responseMessage;
+
+    try
+    {
+        // Parsear el ID de la clase
+        if (!int.TryParse(data, out var classId))
         {
             return new ProtocolMessage(
                 ProtocolConstants.HEADER_RESPONSE,
                 ProtocolConstants.CMD_ERROR,
-                "Acción no permitida. Debes iniciar sesión primero."
+                "ID de clase inválido"
             );
         }
 
+        // Buscar la clase
+        if (!_classes.TryGetValue(classId, out var targetClass))
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                "Clase no encontrada"
+            );
+        }
+
+        // Obtener el nombre de usuario actual
+        var username = UserService.Instance.GetLoggedInUsername(clientId);
+        if (string.IsNullOrEmpty(username))
+        {
+            return new ProtocolMessage(
+                ProtocolConstants.HEADER_RESPONSE,
+                ProtocolConstants.CMD_ERROR,
+                "No se pudo obtener el usuario actual"
+            );
+        }
+
+        // Obtener semáforo para esta clase específica (locking granular)
+        var semaphore = _classLocks.GetOrAdd(classId, _ => new SemaphoreSlim(1, 1));
+
+        // Flags para limpieza posterior
+        bool removed = false;
+        ClassSession removedClass = null;
+
+        semaphore.Wait();
         try
         {
-            // Parsear el ID de la clase
-            if (!int.TryParse(data, out var classId))
+            // Re-verificar que la clase aún existe dentro del lock
+            if (!_classes.TryGetValue(classId, out targetClass))
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "ID de clase inválido"
-                );
-            }
-
-            // Buscar la clase
-            if (!_classes.TryGetValue(classId, out var targetClass))
-            {
-                return new ProtocolMessage(
+                responseMessage = new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
                     ProtocolConstants.CMD_ERROR,
                     "Clase no encontrada"
                 );
+                return responseMessage;
             }
 
-            // Obtener el nombre de usuario actual
-            var username = UserService.Instance.GetLoggedInUsername(clientId);
-            if (string.IsNullOrEmpty(username))
+            // Verificar que el usuario sea el creador de la clase (re-verificar dentro del lock)
+            if (targetClass.CreatedBy != username)
             {
-                return new ProtocolMessage(
+                responseMessage = new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
                     ProtocolConstants.CMD_ERROR,
-                    "No se pudo obtener el usuario actual"
+                    "Solo el creador de la clase puede eliminarla"
                 );
+                return responseMessage;
             }
 
-            // Obtener semáforo para esta clase específica
-            var semaphore = _classLocks.GetOrAdd(classId, _ => new SemaphoreSlim(1, 1));
-            
-            semaphore.Wait();
-            try
+            // Verificar que no haya usuarios inscritos (re-verificar dentro del lock)
+            if (targetClass.EnrolledCount > 0)
             {
-                // Re-verificar que la clase aún existe dentro del lock
-                if (!_classes.TryGetValue(classId, out targetClass))
-                {
-                    return new ProtocolMessage(
-                        ProtocolConstants.HEADER_RESPONSE,
-                        ProtocolConstants.CMD_ERROR,
-                        "Clase no encontrada"
-                    );
-                }
+                responseMessage = new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se puede eliminar una clase que tiene usuarios inscritos"
+                );
+                return responseMessage;
+            }
 
-                // Verificar que el usuario sea el creador de la clase (re-verificar dentro del lock)
-                if (targetClass.CreatedBy != username)
-                {
-                    return new ProtocolMessage(
-                        ProtocolConstants.HEADER_RESPONSE,
-                        ProtocolConstants.CMD_ERROR,
-                        "Solo el creador de la clase puede eliminarla"
-                    );
-                }
+            // Verificar que la clase no haya comenzado (re-verificar dentro del lock)
+            if (targetClass.StartDateTime <= DateTime.Now)
+            {
+                responseMessage = new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_ERROR,
+                    "No se puede eliminar una clase que ya ha comenzado"
+                );
+                return responseMessage;
+            }
 
-                // Verificar que no haya usuarios inscritos (re-verificar dentro del lock)
-                if (targetClass.EnrolledCount > 0)
+            // Intentar eliminar la clase
+            if (_classes.TryRemove(classId, out removedClass))
+            {
+                // Eliminar imagen asociada si existe
+                if (!string.IsNullOrEmpty(removedClass.ImagePath) && File.Exists(removedClass.ImagePath))
                 {
-                    return new ProtocolMessage(
-                        ProtocolConstants.HEADER_RESPONSE,
-                        ProtocolConstants.CMD_ERROR,
-                        "No se puede eliminar una clase que tiene usuarios inscritos"
-                    );
-                }
-
-                // Verificar que la clase no haya comenzado (re-verificar dentro del lock)
-                if (targetClass.StartDateTime <= DateTime.Now)
-                {
-                    return new ProtocolMessage(
-                        ProtocolConstants.HEADER_RESPONSE,
-                        ProtocolConstants.CMD_ERROR,
-                        "No se puede eliminar una clase que ya ha comenzado"
-                    );
-                }
-
-                // Eliminar la clase de forma atómica dentro del lock
-                if (_classes.TryRemove(classId, out var removedClass))
-                {
-                    // Eliminar imagen asociada si existe
-                    if (!string.IsNullOrEmpty(removedClass.ImagePath) && File.Exists(removedClass.ImagePath))
+                    try
                     {
-                        try
-                        {
-                            File.Delete(removedClass.ImagePath);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Advertencia: No se pudo eliminar la imagen {removedClass.ImagePath}: {ex.Message}");
-                        }
+                        File.Delete(removedClass.ImagePath);
                     }
-
-                    // Limpiar el semáforo asociado si existe
-                    if (_classLocks.TryRemove(classId, out var semaphoreToDispose))
+                    catch (Exception ex)
                     {
-                        semaphoreToDispose.Dispose();
+                        Console.WriteLine($"Advertencia: No se pudo eliminar la imagen {removedClass.ImagePath}: {ex.Message}");
                     }
-
-                    Console.WriteLine($"Clase eliminada: {removedClass.Id} ({removedClass.Name}) por {username}");
-
-                    return new ProtocolMessage(
-                        ProtocolConstants.HEADER_RESPONSE,
-                        ProtocolConstants.CMD_DELETE_CLASS,
-                        $"OK|Clase '{removedClass.Name}' eliminada exitosamente"
-                    );
                 }
 
-                return new ProtocolMessage(
+                // marcar que se eliminó (limpieza del semáforo se hace *después* del finally)
+                removed = true;
+
+                Console.WriteLine($"Clase eliminada: {removedClass.Id} ({removedClass.Name}) por {username}");
+
+                responseMessage = new ProtocolMessage(
+                    ProtocolConstants.HEADER_RESPONSE,
+                    ProtocolConstants.CMD_DELETE_CLASS,
+                    $"OK|Clase '{removedClass.Name}' eliminada exitosamente"
+                );
+            }
+            else
+            {
+                responseMessage = new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
                     ProtocolConstants.CMD_ERROR,
                     "Error al eliminar la clase"
                 );
             }
-            finally
+        }
+        finally
+        {
+            // Always release the semaphore we waited on
+            try
             {
                 semaphore.Release();
             }
+            catch (ObjectDisposedException)
+            {
+                // Shouldn't happen with the new ordering, but guard just in case
+            }
         }
-        catch (Exception ex)
+
+        // Ahora que liberamos el semáforo, podemos removerlo y disponerlo si corresponde
+        if (removed)
         {
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_ERROR,
-                $"Error inesperado: {ex.Message}"
-            );
+            if (_classLocks.TryRemove(classId, out var semaphoreToDispose))
+            {
+                try
+                {
+                    semaphoreToDispose.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Advertencia: no se pudo dispose del semáforo: {ex.Message}");
+                }
+            }
         }
+
+        return responseMessage;
     }
+    catch (Exception ex)
+    {
+        return new ProtocolMessage(
+            ProtocolConstants.HEADER_RESPONSE,
+            ProtocolConstants.CMD_ERROR,
+            $"Error inesperado: {ex.Message}"
+        );
+    }
+}
     
     public ProtocolMessage HandleSearchClasses(string data)
     {
