@@ -176,12 +176,13 @@ public class ClassService
         
         foreach (var c in classes)
         {
-            string hasImage = string.IsNullOrEmpty(c.ImagePath) ? "No" : "Sí";
+            // --- If the Class has an image: 1, otherwise 0 ---
+            string hasImageFlag = string.IsNullOrEmpty(c.ImagePath) ? "0" : "1";
             int enrolled = c.EnrolledCount;
 
-            sb.AppendLine($"{c.Id} | {c.Name} | {c.Description} | " +
-                          $"{c.StartDateTime:yyyy-MM-dd HH:mm} | {c.DurationMinutes} min | " +
-                          $"Cupos: {enrolled}/{c.MaxSeats} | Imagen: {hasImage}");
+            sb.AppendLine($"{c.Id}|{c.Name}|{c.Description}|" +
+                          $"{c.StartDateTime:yyyy-MM-dd HH:mm}|{c.DurationMinutes} min|" +
+                          $"{enrolled}/{c.MaxSeats}|{hasImageFlag}");
         }
 
         return new ProtocolMessage(
@@ -837,7 +838,29 @@ public class ClassService
             sb.Length > 0 ? sb.ToString() : "No tienes inscripciones registradas."
         );
     }
+    
+    public string GetClassImageAsBase64(int classId)
+    {
+        // 1. Search for the class
+        if (!_classes.TryGetValue(classId, out var targetClass))
+        {
+            throw new ArgumentException("Clase no encontrada");
+        }
 
+        // 2. Verify if the class has an image associated
+        if (string.IsNullOrEmpty(targetClass.ImagePath))
+        {
+            throw new InvalidOperationException("Esta clase no tiene una imagen asociada.");
+        }
 
+        // 3. Verify if the image exists on the server
+        if (!File.Exists(targetClass.ImagePath))
+        {
+            throw new FileNotFoundException("El archivo de la imagen no se encontró en el servidor.");
+        }
 
+        // 4. Read the file and convert it to Base64
+        byte[] imageBytes = File.ReadAllBytes(targetClass.ImagePath);
+        return Convert.ToBase64String(imageBytes);
+    }
 }

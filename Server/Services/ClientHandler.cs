@@ -151,9 +151,14 @@ public class ClientHandler
                     var searchResponse = _classService.HandleSearchClasses(message.Data);
                     _protocolHandler.SendMessage(_clientSocket, searchResponse);
                     break;
+                
                 case ProtocolConstants.CMD_HISTORY:
                     var historyResponse = _classService.HandleHistory(Id);
                     _protocolHandler.SendMessage(_clientSocket, historyResponse);
+                    break;
+                
+                case ProtocolConstants.CMD_DOWNLOAD_IMAGE:
+                    HandleDownloadImageRequest(message);
                     break;
 
                 default:
@@ -167,7 +172,25 @@ public class ClientHandler
             SendErrorResponse($"Error inesperado: {ex.Message}");
         }
     }
+    
+    private void HandleDownloadImageRequest(ProtocolMessage message)
+    {
+        try
+        {
+            if (!_userService.IsUserLoggedIn(Id)) 
+                throw new InvalidOperationException("Debes iniciar sesión para hacer esto.");
 
+            if (!int.TryParse(message.Data, out int classId)) 
+                throw new ArgumentException("ID de clase inválido.");
+
+            string imageBase64 = _classService.GetClassImageAsBase64(classId);
+            SendResponse(message.Command, imageBase64);
+        }
+        catch (Exception ex)
+        {
+            SendErrorResponse(ex.Message);
+        }
+    }
 
     private void SendResponse(int command, string data)
     {

@@ -126,10 +126,39 @@ public class MenuManager
     /// Displays a list of available classes
     /// </summary>
     /// <param name="classesData">Formatted string with class information</param>
+    // Client/Services/MenuManager.cs
     public void DisplayClassList(string classesData)
     {
-        Console.WriteLine("===== Clases disponibles =====");
-        Console.WriteLine(classesData);
+        Console.WriteLine("\n===== Clases disponibles =====");
+        var classLines = classesData.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+
+        if (classLines.Length == 0)
+        {
+            Console.WriteLine("No hay clases disponibles en este momento.");
+        }
+        else
+        {
+            foreach (var line in classLines)
+            {
+                var parts = line.Split('|');
+                if (parts.Length < 7) continue;
+
+                // Format: 0:ID|1:Nombre|2:Desc|3:Fecha|4:Dur|5:Cupos|6:TieneImagen
+                Console.WriteLine($"ID: {parts[0]} - {parts[1]} ({parts[5]})");
+                Console.WriteLine($"   Descripción: {parts[2]}");
+                Console.WriteLine($"   Inicio: {parts[3]} ({parts[4]})");
+
+                // --- If it has an image available for download ---
+                if (parts[6] == "1")
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($" -> Para descargar la imagen, escribe: descargar {parts[0]}");
+                    Console.ResetColor();
+                }
+                Console.WriteLine();
+            }
+        }
+        Console.WriteLine("==============================");
     }
 
     /// <summary>
@@ -138,7 +167,9 @@ public class MenuManager
     /// <param name="message">Success message to display</param>
     public void ShowSuccess(string message)
     {
+        Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"✅ {message}");
+        Console.ResetColor();
     }
 
     /// <summary>
@@ -147,7 +178,9 @@ public class MenuManager
     /// <param name="message">Error message to display</param>
     public void ShowError(string message)
     {
+        Console.ForegroundColor = ConsoleColor.DarkRed;
         Console.WriteLine($"⚠️ {message}");
+        Console.ResetColor();
     }
 
     /// <summary>
@@ -156,7 +189,9 @@ public class MenuManager
     /// <param name="message">Message to display</param>
     public void ShowInfo(string message)
     {
+        Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"\n-> {message}");
+        Console.ResetColor();
     }
 
     /// <summary>
@@ -213,7 +248,7 @@ public class MenuManager
             string input = Console.ReadLine() ?? "";
             if (int.TryParse(input, out maxSeats) && maxSeats > 0)
                 break;
-            Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
+            ShowError("Ingrese un número válido mayor a 0.");
         }
 
         // Duración
@@ -224,7 +259,7 @@ public class MenuManager
             string input = Console.ReadLine() ?? "";
             if (int.TryParse(input, out duration) && duration > 0)
                 break;
-            Console.WriteLine("⚠️ Ingrese un número válido mayor a 0.");
+            ShowError("Ingrese un número válido mayor a 0.");
         }
 
         // Fecha
@@ -236,7 +271,7 @@ public class MenuManager
             if (DateTime.TryParse(input, out startDateTime))
                 break;
 
-            Console.WriteLine("⚠️ Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
+            ShowError("Formato de fecha inválido. Ejemplo: 2025-09-15 14:30");
         }
 
         // Imagen
@@ -303,7 +338,7 @@ public class MenuManager
                 return null;
 
             default:
-                Console.WriteLine("⚠️ Opción inválida.");
+                ShowError("Opción inválida.");
                 return null;
         }
 

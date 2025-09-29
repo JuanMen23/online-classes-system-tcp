@@ -123,8 +123,25 @@ public class ApplicationCoordinator
     {
         _menuManager.ShowLoggedInMenu(_authController.CurrentUser ?? "");
         string? choice = _menuManager.ReadLine();
-    
+
         if (string.IsNullOrEmpty(choice)) return;
+
+        string cleanChoice = choice.Trim().ToLower();
+        
+        if (cleanChoice.StartsWith("descargar"))
+        {
+            var parts = cleanChoice.Split(' ');
+            
+            if (parts.Length == 2 && !string.IsNullOrEmpty(parts[1]))
+            {
+                _classController.DownloadImage(_socketService, SetWaitingForResponse, parts[1]);
+            }
+            else
+            {
+                _menuManager.ShowError("Comando incompleto. Uso correcto: descargar + ID de clase");
+            }
+            return;
+        }
 
         switch (choice)
         {
