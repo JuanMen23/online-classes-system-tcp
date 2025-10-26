@@ -1,4 +1,4 @@
-using System.Net;
+using System.Threading.Tasks;
 using System.Net.Sockets;
 using Common.Config;
 using Common.Protocol;
@@ -29,6 +29,11 @@ public class SocketService
     /// </summary>
     public void Connect()
     {
+        if (IsConnected)
+        {
+            Console.WriteLine("Socket already connected, attempting to disconnect first...");
+            Disconnect();
+        }
         try
         {
             // Create a TCP socket (IPv4)
@@ -65,20 +70,37 @@ public class SocketService
     /// Sends a protocol message to the server
     /// </summary>
     /// <param name="message">The protocol message to send</param>
-    public void SendMessage(ProtocolMessage message)
+    public async Task SendMessageAsync(ProtocolMessage message)
     {
         if (!IsConnected) throw new InvalidOperationException("Not connected to server");
-        _protocolHandler.SendMessage(_clientSocket!, message);
+        await _protocolHandler.SendMessageAsync(_clientSocket!, message);
     }
     
     /// <summary>
     /// Receives a protocol message from the server
     /// </summary>
     /// <returns>The received protocol message, or null if connection was closed</returns>
-    public ProtocolMessage? ReceiveMessage()
+    public async Task<ProtocolMessage?> ReceiveMessageAsync()
     {
         if (!IsConnected) return null;
-        return _protocolHandler.ReceiveMessage(_clientSocket!);
+        try
+        {
+            return await _protocolHandler.ReceiveMessageAsync(_clientSocket!);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("closed"))
+        {
+            return null;
+        }
+        catch (SocketException)
+        {
+            return null;
+        }
+    }
+    
+    public Socket GetSocket()
+    {
+        if (_clientSocket == null) throw new InvalidOperationException("Socket not initialized.");
+        return _clientSocket;
     }
 
 
@@ -87,9 +109,11 @@ public class SocketService
     /// </summary>
     public void Disconnect()
     {
+        if (_clientSocket == null) return;
+        
         try
         {
-            if (_clientSocket != null && _clientSocket.Connected)
+            if (_clientSocket.Connected)
             {
                 // Close connection gracefully
                 _clientSocket.Shutdown(SocketShutdown.Both);  // Close send and receive
@@ -101,7 +125,8 @@ public class SocketService
         }
         finally
         {
-            _clientSocket?.Close();  // Release resources
+            _clientSocket?.Close();
+            _clientSocket = null;
         }
     }
 }

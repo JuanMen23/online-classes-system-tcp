@@ -1,6 +1,7 @@
 using Common.Protocol;
 using Client.Services;
 using Common;
+using System.Threading.Tasks;
 
 namespace Client.Controllers;
 
@@ -16,7 +17,9 @@ public class ApplicationCoordinator
     private readonly ResponseHandler _responseHandler;
     
     private bool _isRunning;
-    private volatile bool _waitingForServerResponse = false;
+    private volatile bool _waitingForServerResponse;
+    
+    private readonly ProtocolHandler _protocolHandler = new();
 
     public ApplicationCoordinator(SocketService socketService, MenuManager menuManager, 
         AuthController authController, ClassController classController)
@@ -36,7 +39,7 @@ public class ApplicationCoordinator
     /// <summary>
     /// Starts the main application loop
     /// </summary>
-    public void Start()
+    public async Task StartAsync()
     {
         try
         {
@@ -48,13 +51,9 @@ public class ApplicationCoordinator
             _menuManager.ShowConnectionStatus("¡Conectado al servidor!");
             _isRunning = true;
 
-            // Start thread to receive messages from server
-            var receiveThread = new Thread(ReceiveMessages);
-            receiveThread.IsBackground = true;
-            receiveThread.Start();
-
-            // Main application loop
-            Run();
+            _ = ReceiveMessagesAsync();
+            
+            await RunAsync();
         }
         catch (Exception ex)
         {
@@ -69,13 +68,13 @@ public class ApplicationCoordinator
     /// <summary>
     /// Main application loop
     /// </summary>
-    private void Run()
+    private async Task RunAsync()
     {
         while (_isRunning)
         {
             if (_waitingForServerResponse)
             {
-                Thread.Sleep(100);
+                await Task.Delay(100);
                 continue;
             }
 
@@ -83,11 +82,11 @@ public class ApplicationCoordinator
 
             if (!_authController.IsLoggedIn)
             {
-                ShowLoggedOutMenu();
+                await ShowLoggedOutMenuAsync();
             }
             else
             {
-                ShowLoggedInMenu();
+                await ShowLoggedInMenuAsync();
             }
         }
     }
@@ -95,7 +94,7 @@ public class ApplicationCoordinator
     /// <summary>
     /// Shows the menu for users who are not logged in
     /// </summary>
-    private void ShowLoggedOutMenu()
+    private async Task ShowLoggedOutMenuAsync()
     {
         _menuManager.ShowLoggedOutMenu();
         string? choice = _menuManager.ReadLine();
@@ -103,10 +102,10 @@ public class ApplicationCoordinator
         switch (choice)
         {
             case "1": 
-                _authController.HandleRegister(_socketService, SetWaitingForResponse); 
+                await _authController.HandleRegisterAsync(_socketService, SetWaitingForResponse); 
                 break;
             case "2": 
-                _authController.HandleLogin(_socketService, SetWaitingForResponse); 
+                await _authController.HandleLoginAsync(_socketService, SetWaitingForResponse); 
                 break;
             case "3": 
                 _isRunning = false; 
@@ -120,7 +119,7 @@ public class ApplicationCoordinator
     /// <summary>
     /// Shows the menu for logged in users
     /// </summary>
-    private void ShowLoggedInMenu()
+    private async Task ShowLoggedInMenuAsync()
     {
         _menuManager.ShowLoggedInMenu(_authController.CurrentUser ?? "");
         string? choice = _menuManager.ReadLine();
@@ -135,7 +134,7 @@ public class ApplicationCoordinator
             
             if (parts.Length == 2 && !string.IsNullOrEmpty(parts[1]))
             {
-                _classController.DownloadImage(_socketService, SetWaitingForResponse, parts[1]);
+                await _classController.DownloadImageAsync(_socketService, SetWaitingForResponse, parts[1]);
             }
             else
             {
@@ -147,31 +146,31 @@ public class ApplicationCoordinator
         switch (choice)
         {
             case "1":
-                _classController.CreateClass(_socketService, SetWaitingForResponse);
+                await _classController.CreateClassAsync(_socketService, SetWaitingForResponse);
                 break;
             case "2":
-                _classController.ModifyClass(_socketService, SetWaitingForResponse);
+                await _classController.ModifyClassAsync(_socketService, SetWaitingForResponse);
                 break;
             case "3":
-                _classController.DeleteClass(_socketService, SetWaitingForResponse);
+                await _classController.DeleteClassAsync(_socketService, SetWaitingForResponse);
                 break;
             case "4":
-                _classController.RequestClassList(_socketService, SetWaitingForResponse);
+                await _classController.RequestClassListAsync(_socketService, SetWaitingForResponse);
                 break;
             case "5":
-                _classController.EnrollInClass(_socketService, SetWaitingForResponse);
+                await _classController.EnrollInClassAsync(_socketService, SetWaitingForResponse);
                 break;
             case "6":
-                _classController.CancelEnrollment(_socketService, SetWaitingForResponse);
+                await _classController.CancelEnrollmentAsync(_socketService, SetWaitingForResponse);
                 break;
             case "7":
-                _classController.SearchClasses(_socketService, SetWaitingForResponse);
+                await _classController.SearchClassesAsync(_socketService, SetWaitingForResponse);
                 break;
             case "8":
-                _classController.RequestHistory(_socketService, SetWaitingForResponse);
+                await _classController.RequestHistoryAsync(_socketService, SetWaitingForResponse);
                 break;
             case "9":
-                _authController.HandleLogout(_socketService, SetWaitingForResponse);
+                await _authController.HandleLogoutAsync(_socketService, SetWaitingForResponse);
                 break;
             default:
                 PrintMessage.Error("Opción no válida.");
@@ -182,13 +181,13 @@ public class ApplicationCoordinator
     /// <summary>
     /// Receives and processes messages from the server
     /// </summary>
-    private void ReceiveMessages()
+    private async Task ReceiveMessagesAsync()
     {
         try
         {
             while (_isRunning)
             {
-                ProtocolMessage? response = _socketService.ReceiveMessage();
+                ProtocolMessage? response = await _socketService.ReceiveMessageAsync();
 
                 if (response == null)
                 {

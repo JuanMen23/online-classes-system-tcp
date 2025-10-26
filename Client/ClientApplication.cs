@@ -33,8 +33,8 @@ public class ClientApplication
     /// <summary>
     /// Starts the client application
     /// </summary>
-    public void Start()
+    public async Task StartAsync()
     {
-        _coordinator.Start();
+        await _coordinator.StartAsync();
     }
 }
