@@ -23,7 +23,7 @@ public class ClassController
     /// </summary>
     /// <param name="socketService">Socket service for sending messages</param>
     /// <param name="setWaitingForResponse">Callback to set waiting state</param>
-    public void CreateClass(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task CreateClassAsync(SocketService socketService, Action<bool> setWaitingForResponse)
 {
     try
     {
@@ -66,7 +66,7 @@ public class ClassController
         );
 
         setWaitingForResponse(true);
-        socketService.SendMessage(request);
+        await socketService.SendMessageAsync(request);
         PrintMessage.Information("Solicitud de creación de clase enviada.");
     }
     catch (Exception ex)
@@ -80,7 +80,7 @@ public class ClassController
     /// </summary>
     /// <param name="socketService">Socket service for sending messages</param>
     /// <param name="setWaitingForResponse">Callback to set waiting state</param>
-    public void RequestClassList(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task RequestClassListAsync(SocketService socketService, Action<bool> setWaitingForResponse)
     {
         try
         {
@@ -91,7 +91,7 @@ public class ClassController
             );
 
             setWaitingForResponse(true);
-            socketService.SendMessage(request);
+            await socketService.SendMessageAsync(request);
             PrintMessage.Information("Solicitud de listado de clases enviada.");
         }
         catch (Exception ex)
@@ -144,7 +144,7 @@ public class ClassController
     /// </summary>
     /// <param name="socketService">Socket service for sending messages</param>
     /// <param name="setWaitingForResponse">Callback to set waiting state</param>
-    public void EnrollInClass(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task EnrollInClassAsync(SocketService socketService, Action<bool> setWaitingForResponse)
     {
         try
         {
@@ -163,7 +163,7 @@ public class ClassController
             );
 
             setWaitingForResponse(true);
-            socketService.SendMessage(request);
+            await socketService.SendMessageAsync(request);
             PrintMessage.Information("Solicitud de inscripción enviada.");
         }
         catch (Exception ex)
@@ -177,7 +177,7 @@ public class ClassController
     /// </summary>
     /// <param name="socketService">Socket service for sending messages</param>
     /// <param name="setWaitingForResponse">Callback to set waiting state</param>
-    public void CancelEnrollment(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task CancelEnrollmentAsync(SocketService socketService, Action<bool> setWaitingForResponse)
     {
         try
         {
@@ -196,7 +196,7 @@ public class ClassController
             );
 
             setWaitingForResponse(true);
-            socketService.SendMessage(request);
+            await socketService.SendMessageAsync(request);
             PrintMessage.Information("Solicitud de cancelación de inscripción enviada.");
         }
         catch (Exception ex)
@@ -210,7 +210,7 @@ public class ClassController
     /// </summary>
     /// <param name="socketService">Socket service for sending messages</param>
     /// <param name="setWaitingForResponse">Callback to set waiting state</param>
-    public void ModifyClass(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task ModifyClassAsync(SocketService socketService, Action<bool> setWaitingForResponse)
     {
         try
         {
@@ -251,7 +251,7 @@ public class ClassController
             );
 
             setWaitingForResponse(true);
-            socketService.SendMessage(request);
+            await socketService.SendMessageAsync(request);
             PrintMessage.Information("Solicitud de modificación de clase enviada.");
         }
         catch (Exception ex)
@@ -265,7 +265,7 @@ public class ClassController
     /// </summary>
     /// <param name="socketService">Socket service for sending messages</param>
     /// <param name="setWaitingForResponse">Callback to set waiting state</param>
-    public void DeleteClass(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task DeleteClassAsync(SocketService socketService, Action<bool> setWaitingForResponse)
     {
         try
         {
@@ -294,7 +294,7 @@ public class ClassController
             );
 
             setWaitingForResponse(true);
-            socketService.SendMessage(request);
+            await socketService.SendMessageAsync(request);
             PrintMessage.Information("Solicitud de eliminación de clase enviada.");
         }
         catch (Exception ex)
@@ -303,7 +303,7 @@ public class ClassController
         }
     }
     
-    public void SearchClasses(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task SearchClassesAsync(SocketService socketService, Action<bool> setWaitingForResponse)
     {
         var data = _menuManager.PromptSearchClasses();
         if (data == null) return; // el usuario canceló
@@ -315,11 +315,11 @@ public class ClassController
         );
 
         setWaitingForResponse(true);
-        socketService.SendMessage(request);
+        await socketService.SendMessageAsync(request);
         PrintMessage.Information("Solicitud de búsqueda enviada.");
     }
     
-    public void RequestHistory(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task RequestHistoryAsync(SocketService socketService, Action<bool> setWaitingForResponse)
     {
         var request = new ProtocolMessage(
             ProtocolConstants.HEADER_REQUEST,
@@ -328,10 +328,10 @@ public class ClassController
         );
 
         setWaitingForResponse(true);
-        socketService.SendMessage(request);
+        await socketService.SendMessageAsync(request);
         PrintMessage.Information("Solicitud de historial enviada.");
     }
-    public void DownloadImage(SocketService socketService, Action<bool> setWaitingForResponse, string classId)
+    public async Task DownloadImageAsync(SocketService socketService, Action<bool> setWaitingForResponse, string classId)
     {
         try
         {
@@ -342,7 +342,7 @@ public class ClassController
             );
 
             setWaitingForResponse(true);
-            socketService.SendMessage(request);
+            await socketService.SendMessageAsync(request);
             PrintMessage.Information($"Solicitando imagen para la clase {classId}...");
         }
         catch (Exception ex)

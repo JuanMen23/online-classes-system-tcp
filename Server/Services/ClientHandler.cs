@@ -1,6 +1,6 @@
 using System.Net.Sockets;
 using Common.Protocol;
-using Server.Data;
+using System.Threading.Tasks;
 
 namespace Server.Services;
 
@@ -29,30 +29,24 @@ public class ClientHandler
         Id = Guid.NewGuid();
     }
 
-    public void HandleClient()
+    public async Task HandleClientAsync()
     {
         RegisterClient();
 
-        try
+        try { await ProcessClientMessagesAsync(); }
+        
+        catch (SocketException ex) { HandleSocketException(ex); }
+        
+        catch (ObjectDisposedException) { HandleObjectDisposedException(); }
+        
+        catch (InvalidOperationException ex) when (ex.Message.Contains("closed"))
         {
-            ProcessClientMessages();
+            _state.MarkAsDisconnectedNaturally();
         }
-        catch (SocketException ex)
-        {
-            HandleSocketException(ex);
-        }
-        catch (ObjectDisposedException)
-        {
-            HandleObjectDisposedException();
-        }
-        catch (Exception ex)
-        {
-            HandleGenericException(ex);
-        }
-        finally
-        {
-            CleanupClient();
-        }
+        
+        catch (Exception ex) { HandleGenericException(ex); }
+        
+        finally { CleanupClient(); }
     }
 
     private void RegisterClient()
@@ -60,16 +54,16 @@ public class ClientHandler
         _clientManager.AddClient(this);
     }
 
-    private void ProcessClientMessages()
+    private async Task ProcessClientMessagesAsync()
     {
         while (_state.IsConnected)
         {
             try
             {
-                var receivedMessage = _protocolHandler.ReceiveMessage(_clientSocket);
+                var receivedMessage = await _protocolHandler.ReceiveMessageAsync(_clientSocket);
                 Console.WriteLine($"Recibido: {receivedMessage}");
 
-                ProcessCommand(receivedMessage);
+                await ProcessCommandAsync(receivedMessage);
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("Connection closed"))
             {
@@ -92,7 +86,7 @@ public class ClientHandler
         }
     }
 
-    private void ProcessCommand(ProtocolMessage message)
+    private async Task ProcessCommandAsync(ProtocolMessage message)
     {
         try
         {
@@ -103,77 +97,77 @@ public class ClientHandler
                 case ProtocolConstants.CMD_REGISTER:
                     var partsReg = message.Data.Split('|');
                     responseData = _userService.RegisterUser(partsReg[0], partsReg[1]);
-                    SendResponse(message.Command, responseData);
+                    await SendResponseAsync(message.Command, responseData);
                     break;
 
                 case ProtocolConstants.CMD_LOGIN:
                     var partsLog = message.Data.Split('|');
                     responseData = _userService.LoginUser(Id, partsLog[0], partsLog[1]);
-                    SendResponse(message.Command, responseData);
+                    await SendResponseAsync(message.Command, responseData);
                     break;
 
                 case ProtocolConstants.CMD_LOGOUT:
                     _userService.LogoutUser(Id);
-                    SendResponse(message.Command, ProtocolConstants.RESPONSE_OK);
+                    await SendResponseAsync(message.Command, ProtocolConstants.RESPONSE_OK);
                     break;
 
                 case ProtocolConstants.CMD_CREATE_CLASS:
                     var createResponse = _classService.HandleCreateClass(message.Data, Id);
-                    _protocolHandler.SendMessage(_clientSocket, createResponse);
+                    await _protocolHandler.SendMessageAsync(_clientSocket, createResponse);
                     break;
 
                 case ProtocolConstants.CMD_MODIFY_CLASS:
                     var modifyResponse = _classService.HandleModifyClass(message.Data, Id);
-                    _protocolHandler.SendMessage(_clientSocket, modifyResponse);
+                    await _protocolHandler.SendMessageAsync(_clientSocket, modifyResponse);
                     break;
 
                 case ProtocolConstants.CMD_LIST_CLASSES:
                     var listResponse = _classService.HandleListClasses();
-                    _protocolHandler.SendMessage(_clientSocket, listResponse);
+                    await _protocolHandler.SendMessageAsync(_clientSocket, listResponse);
                     break;
 
                 case ProtocolConstants.CMD_ENROLL_CLASS:
                     var enrollResponse = _classService.HandleEnrollClass(message.Data, Id);
-                    _protocolHandler.SendMessage(_clientSocket, enrollResponse);
+                    await _protocolHandler.SendMessageAsync(_clientSocket, enrollResponse);
                     break;
 
                 case ProtocolConstants.CMD_CANCEL_ENROLL:
                     var cancelResponse = _classService.HandleCancelEnrollment(message.Data, Id);
-                    _protocolHandler.SendMessage(_clientSocket, cancelResponse);
+                    await _protocolHandler.SendMessageAsync(_clientSocket, cancelResponse);
                     break;
 
                 case ProtocolConstants.CMD_DELETE_CLASS:
                     var deleteResponse = _classService.HandleDeleteClass(message.Data, Id);
-                    _protocolHandler.SendMessage(_clientSocket, deleteResponse);
+                    await _protocolHandler.SendMessageAsync(_clientSocket, deleteResponse);
                     break;
                 
                 case ProtocolConstants.CMD_SEARCH_CLASSES:
                     var searchResponse = _classService.HandleSearchClasses(message.Data);
-                    _protocolHandler.SendMessage(_clientSocket, searchResponse);
+                    await _protocolHandler.SendMessageAsync(_clientSocket, searchResponse);
                     break;
                 
                 case ProtocolConstants.CMD_HISTORY:
                     var historyResponse = _classService.HandleHistory(Id);
-                    _protocolHandler.SendMessage(_clientSocket, historyResponse);
+                    await _protocolHandler.SendMessageAsync(_clientSocket, historyResponse);
                     break;
                 
                 case ProtocolConstants.CMD_DOWNLOAD_IMAGE:
-                    HandleDownloadImageRequest(message);
+                    await HandleDownloadImageRequestAsync(message);
                     break;
 
                 default:
-                    SendResponse(message.Command, "Comando desconocido");
+                    await SendResponseAsync(message.Command, "Comando desconocido");
                     break;
             }
         }
         catch (Exception ex)
         {
             // Fallback general error
-            SendErrorResponse($"Error inesperado: {ex.Message}");
+            await SendErrorResponseAsync($"Error inesperado: {ex.Message}");
         }
     }
     
-    private void HandleDownloadImageRequest(ProtocolMessage message)
+    private async Task HandleDownloadImageRequestAsync(ProtocolMessage message)
     {
         try
         {
@@ -184,32 +178,28 @@ public class ClientHandler
                 throw new ArgumentException("ID de clase inválido.");
 
             string imageBase64 = _classService.GetClassImageAsBase64(classId);
-            SendResponse(message.Command, imageBase64);
+            await SendResponseAsync(message.Command, imageBase64);
         }
         catch (Exception ex)
         {
-            SendErrorResponse(ex.Message);
+            await SendErrorResponseAsync(ex.Message);
         }
     }
 
-    private void SendResponse(int command, string data)
+    private async Task SendResponseAsync(int command, string data)
     {
-        var responseMessage = new ProtocolMessage(
-            ProtocolConstants.HEADER_RESPONSE,
-            command,
-            data
-        );
-        _protocolHandler.SendMessage(_clientSocket, responseMessage);
+        var responseMessage = new ProtocolMessage(ProtocolConstants.HEADER_RESPONSE, command, data);
+        await _protocolHandler.SendMessageAsync(_clientSocket, responseMessage);
     }
 
-    private void SendErrorResponse(string errorMessage)
+    private async Task SendErrorResponseAsync(string errorMessage)
     {
         var errorResponse = new ProtocolMessage(
             ProtocolConstants.HEADER_RESPONSE,
             ProtocolConstants.CMD_ERROR,
             errorMessage
         );
-        _protocolHandler.SendMessage(_clientSocket, errorResponse);
+        await _protocolHandler.SendMessageAsync(_clientSocket, errorResponse);
         Console.WriteLine($"[ERROR] {errorMessage}");
     }
 
