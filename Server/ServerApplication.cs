@@ -29,7 +29,7 @@ public class ServerApplication
     /// <summary>
     /// Starts the server and begins listening for client connections
     /// </summary>
-    public void Start()
+    public async Task StartAsync()
     {
         try
         {
@@ -40,9 +40,11 @@ public class ServerApplication
             Console.WriteLine("Esperando clientes...");
             Console.WriteLine($"Escriba '{Common.Protocol.ProtocolConstants.EXIT_COMMAND}' para cerrar el servidor de forma controlada");
 
-            // Start console command handler in a separate thread
-            var consoleThread = new Thread(HandleConsoleCommands);
-            consoleThread.IsBackground = true;
+            // StartAsync console command handler in a separate thread
+            var consoleThread = new Thread(HandleConsoleCommands)
+            {
+                IsBackground = true
+            };
             consoleThread.Start();
 
             // Main server loop
@@ -51,12 +53,12 @@ public class ServerApplication
                 try
                 {
                     // Accept incoming connection (blocking until a client connects)
-                    Socket clientSocket = _serverSocket!.Accept();
+                    Socket clientSocket = await _serverSocket!.AcceptAsync();
                     Console.WriteLine("Cliente conectado");
 
                     // Handle each client in a separate thread
                     var clientHandler = new ClientHandler(clientSocket);
-                    new Thread(() => clientHandler.HandleClient()).Start();
+                    _ = clientHandler.HandleClientAsync();
                 }
                 catch (ObjectDisposedException)
                 {
@@ -76,6 +78,7 @@ public class ServerApplication
         {
             Console.WriteLine($"Error al iniciar el servidor: {ex.Message}");
         }
+        finally { Stop();}
     }
 
     /// <summary>

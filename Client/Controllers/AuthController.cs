@@ -40,7 +40,7 @@ public class AuthController
     /// </summary>
     /// <param name="socketService">Socket service for sending messages</param>
     /// <param name="setWaitingForResponse">Callback to set waiting state</param>
-    public void HandleRegister(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task HandleRegisterAsync(SocketService socketService, Action<bool> setWaitingForResponse)
     {
         try
         {
@@ -60,7 +60,7 @@ public class AuthController
             );
 
             setWaitingForResponse(true);
-            socketService.SendMessage(message);
+            await socketService.SendMessageAsync(message);
             PrintMessage.Information("Enviando datos de registro...");
         }
         catch (Exception ex)
@@ -74,7 +74,7 @@ public class AuthController
     /// </summary>
     /// <param name="socketService">Socket service for sending messages</param>
     /// <param name="setWaitingForResponse">Callback to set waiting state</param>
-    public void HandleLogin(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task HandleLoginAsync(SocketService socketService, Action<bool> setWaitingForResponse)
     {
         try
         {
@@ -95,7 +95,7 @@ public class AuthController
             );
 
             setWaitingForResponse(true);
-            socketService.SendMessage(message);
+            await socketService.SendMessageAsync(message);
             PrintMessage.Information("Iniciando sesión...");
         }
         catch (Exception ex)
@@ -109,7 +109,7 @@ public class AuthController
     /// </summary>
     /// <param name="socketService">Socket service for sending messages</param>
     /// <param name="setWaitingForResponse">Callback to set waiting state</param>
-    public void HandleLogout(SocketService socketService, Action<bool> setWaitingForResponse)
+    public async Task HandleLogoutAsync(SocketService socketService, Action<bool> setWaitingForResponse)
     {
         try
         {
@@ -120,7 +120,7 @@ public class AuthController
             );
 
             setWaitingForResponse(true);
-            socketService.SendMessage(message);
+            await socketService.SendMessageAsync(message);
             PrintMessage.Information("Cerrando sesión...");
         }
         catch (Exception ex)

@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Common.Protocol;
 
@@ -137,5 +138,93 @@ public class ProtocolHandler
             
             offset += received;
         }
+    }
+    
+    
+    public async Task SendMessageAsync(Socket socket, ProtocolMessage message)
+    {
+        if (socket == null) throw new ArgumentNullException(nameof(socket));
+        if (message == null) throw new ArgumentNullException(nameof(message));
+
+        try
+        {
+            byte[] headerBytes = Encoding.UTF8.GetBytes(message.Header);
+            await SendCompleteAsync(socket, headerBytes);
+
+            string cmdStr = message.Command.ToString().PadLeft(ProtocolConstants.CMD_LENGTH, '0');
+            byte[] cmdBytes = Encoding.UTF8.GetBytes(cmdStr);
+            await SendCompleteAsync(socket, cmdBytes);
+
+            byte[] largoBytes = BitConverter.GetBytes(message.Length);
+            await SendCompleteAsync(socket, largoBytes);
+
+            if (message.Length > 0)
+            {
+                byte[] dataBytes = Encoding.UTF8.GetBytes(message.Data);
+                await SendCompleteAsync(socket, dataBytes);
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to send protocol message async: {ex.Message}", ex);
+        }
+    }
+
+    public async Task<ProtocolMessage> ReceiveMessageAsync(Socket socket)
+    {
+        if (socket == null) throw new ArgumentNullException(nameof(socket));
+
+        try
+        {
+            byte[] headerBytes = await ReceiveCompleteAsync(socket, ProtocolConstants.HEADER_LENGTH);
+            string header = Encoding.UTF8.GetString(headerBytes);
+
+            byte[] cmdBytes = await ReceiveCompleteAsync(socket, ProtocolConstants.CMD_LENGTH);
+            string cmdStr = Encoding.UTF8.GetString(cmdBytes).TrimStart('0');
+            if (string.IsNullOrEmpty(cmdStr)) cmdStr = "0";
+            int command = int.Parse(cmdStr);
+
+            byte[] largoBytes = await ReceiveCompleteAsync(socket, ProtocolConstants.LARGO_LENGTH);
+            int length = BitConverter.ToInt32(largoBytes);
+
+            string data = "";
+            if (length > 0)
+            {
+                byte[] dataBytes = await ReceiveCompleteAsync(socket, length);
+                data = Encoding.UTF8.GetString(dataBytes);
+            }
+
+            return new ProtocolMessage(header, command, data);
+        }
+        catch (Exception ex) when (!(ex is ArgumentNullException || ex is InvalidOperationException))
+        {
+            // Catch specific exceptions like SocketException if needed for graceful disconnect
+            throw new InvalidOperationException($"Failed to receive protocol message async: {ex.Message}", ex);
+        }
+    }
+
+    private async Task SendCompleteAsync(Socket socket, byte[] data)
+    {
+        int totalSize = data.Length;
+        int offset = 0;
+        while (offset < totalSize)
+        {
+            int sent = await socket.SendAsync(new ArraySegment<byte>(data, offset, totalSize - offset), SocketFlags.None);
+            if (sent == 0) throw new SocketException((int)SocketError.ConnectionAborted);
+            offset += sent;
+        }
+    }
+
+    private async Task<byte[]> ReceiveCompleteAsync(Socket socket, int length)
+    {
+        byte[] buffer = new byte[length];
+        int offset = 0;
+        while (offset < length)
+        {
+            int received = await socket.ReceiveAsync(new ArraySegment<byte>(buffer, offset, length - offset), SocketFlags.None);
+            if (received == 0) throw new InvalidOperationException("Connection closed by remote host");
+            offset += received;
+        }
+        return buffer;
     }
 }

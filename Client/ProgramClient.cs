@@ -10,8 +10,8 @@ var config = new AppConfig();
 var clientApp = new ClientApplication(config);
 
 try
-{
-    clientApp.Start();
+{ 
+    await clientApp.StartAsync();
 }
 catch (Exception ex)
 {
