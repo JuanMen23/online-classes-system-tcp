@@ -1,0 +1,39 @@
+﻿services:
+  server:
+    build:
+      context: .
+      dockerfile: Server/Dockerfile
+    container_name: server-container
+    networks:
+      - obl-network
+    volumes:
+      - ./Server/Images:/app/Images   # accede a imágenes desde host
+    ports:
+      - "20000:20000"
+    environment:
+      - SERVER_IP=0.0.0.0             # escucha en todas las interfaces dentro del contenedor
+      - SERVER_PORT=20000
+      - SERVER_IMAGE_DIRECTORY=/app/Images
+    restart: "no"
+
+  client1:
+    build:
+      context: .
+      dockerfile: Client/Dockerfile
+    container_name: client1
+    networks:
+      - obl-network
+    stdin_open: true
+    tty: true
+    environment:
+      - SERVER_IP=server-container     # nombre del contenedor del server dentro de la red
+      - SERVER_PORT=20000
+      - CLIENT_IP=0.0.0.0
+      - CLIENT_PORT=0
+    depends_on:
+      - server
+    restart: "no"
+
+networks:
+  obl-network:
+    driver: bridge

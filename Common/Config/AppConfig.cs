@@ -5,12 +5,10 @@ namespace Common.Config;
 
 /// <summary>
 /// Configuration class for application settings.
-/// Reads from App.config with safe fallbacks.
+/// Reads from environment variables or defaults.
 /// </summary>
 public class AppConfig
 {
-    private readonly SettingsManager _settings = new();
-
     /// <summary>
     /// Server IP address or hostname
     /// </summary>
@@ -38,23 +36,19 @@ public class AppConfig
 
     public AppConfig()
     {
-        // Leer configuración del servidor
-        ServerIp = _settings.ReadSettings(IpConfig.serverIPconfigKey)
-                   ?? ProtocolConstants.DEFAULT_SERVER_IP;
-
-        string? serverPortStr = _settings.ReadSettings(IpConfig.serverPortconfigKey);
-        ServerPort = int.TryParse(serverPortStr, out int parsedServerPort)
-            ? parsedServerPort
+        // Leer del environment
+        ServerIp = Environment.GetEnvironmentVariable("SERVER_IP") ?? "127.0.0.1";
+        ServerPort = int.TryParse(Environment.GetEnvironmentVariable("SERVER_PORT"), out var sp)
+            ? sp
             : ProtocolConstants.DEFAULT_SERVER_PORT;
 
-        // Leer configuración del cliente
-        ClientIp = _settings.ReadSettings(IpConfig.clientIPconfigKey)
-                   ?? "0.0.0.0"; // 0.0.0.0 para binding dinámico
+        ClientIp = Environment.GetEnvironmentVariable("CLIENT_IP") ?? "0.0.0.0";
+        ClientPort = int.TryParse(Environment.GetEnvironmentVariable("CLIENT_PORT"), out var cp)
+            ? cp
+            : 0;
 
-        string? clientPortStr = _settings.ReadSettings(IpConfig.clientPortconfigKey);
-        ClientPort = int.TryParse(clientPortStr, out int parsedClientPort)
-            ? parsedClientPort
-            : 0; // 0 = puerto dinámico
+        Console.WriteLine($"[DEBUG] SERVER_IP={ServerIp}, SERVER_PORT={ServerPort}");
+        Console.WriteLine($"[DEBUG] CLIENT_IP={ClientIp}, CLIENT_PORT={ClientPort}");
     }
 
     /// <summary>
@@ -69,7 +63,6 @@ public class AppConfig
         // Intentar parsear como IP; si falla, resolver como hostname
         if (!IPAddress.TryParse(ServerIp, out ipAddress))
         {
-            // Resuelve el nombre del contenedor o host dentro de la red Docker
             IPAddress[] addresses = Dns.GetHostAddresses(ServerIp);
             if (addresses.Length == 0)
                 throw new Exception($"No se pudo resolver el host '{ServerIp}'");
