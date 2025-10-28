@@ -14,6 +14,8 @@ public class ServerApplication
     private Socket? _serverSocket;
     private bool _isRunning;
     private readonly ClientManager _clientManager;
+    private readonly DailyReportService _reportService;
+    private CancellationTokenSource _reportCancellationToken = new();
 
     /// <summary>
     /// Initializes a new instance of the ServerApplication
@@ -24,6 +26,8 @@ public class ServerApplication
         _config = config ?? throw new ArgumentNullException(nameof(config));
         LoadDataFromFile();
         _clientManager = ClientManager.Instance;
+        _reportService = new DailyReportService(ClassService.Instance, config.ServerImageDirectory);
+
     }
 
     /// <summary>
@@ -115,7 +119,7 @@ public class ServerApplication
     /// <summary>
     /// Handles console commands for server control
     /// </summary>
-    private void HandleConsoleCommands()
+    private async void HandleConsoleCommands()
     {
         while (_isRunning)
         {
@@ -134,11 +138,40 @@ public class ServerApplication
                         Console.WriteLine("Iniciando cierre controlado del servidor...");
                         Stop();
                         return;
-                        
+
+                    case "REPORT":
+                        Console.WriteLine("Generando reporte del día... (presione C para cancelar)");
+
+                        var reportTask = _reportService.GenerateReportAsync(_reportCancellationToken.Token);
+
+                        while (!reportTask.IsCompleted)
+                        {
+                            if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.C)
+                            {
+                                _reportCancellationToken.Cancel();
+                                Console.WriteLine("Cancelando reporte...");
+                                break;
+                            }
+                            Thread.Sleep(200);
+                        }
+
+                        if (!_reportCancellationToken.IsCancellationRequested)
+                        {
+                            Console.WriteLine(await reportTask);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Reporte cancelado.");
+                            _reportCancellationToken = new CancellationTokenSource(); // reset para la próxima vez
+                        }
+
+                        break;
+
                     default:
-                        Console.WriteLine($"Comando desconocido: '{input}'. Escriba '{Common.Protocol.ProtocolConstants.EXIT_COMMAND}' para cerrar el servidor.");
+                        Console.WriteLine($"Comando desconocido: '{input}'. Escriba 'EXIT' o 'REPORT'.");
                         break;
                 }
+
             }
             catch (Exception ex)
             {
