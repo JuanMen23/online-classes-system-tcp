@@ -5,32 +5,30 @@ namespace Common.Config;
 
 /// <summary>
 /// Configuration class for application settings.
-/// Reads from App.config with safe fallbacks.
+/// Reads from environment variables or defaults.
 /// </summary>
 public class AppConfig
 {
-    private readonly SettingsManager _settings = new();
-    
     /// <summary>
-    /// Server IP address
+    /// Server IP address or hostname
     /// </summary>
     public string ServerIp { get; set; }
-    
+
     /// <summary>
     /// Server port
     /// </summary>
     public int ServerPort { get; set; }
-    
+
     /// <summary>
-    /// Server IP address
+    /// Client IP address
     /// </summary>
     public string ClientIp { get; set; }
-    
+
     /// <summary>
-    /// Server port
+    /// Client port
     /// </summary>
     public int ClientPort { get; set; }
-    
+
     /// <summary>
     /// Maximum number of queued connections
     /// </summary>
@@ -38,38 +36,63 @@ public class AppConfig
 
     public AppConfig()
     {
-        ServerIp = _settings.ReadSettings(IpConfig.serverIPconfigKey) 
-                   ?? ProtocolConstants.DEFAULT_SERVER_IP;
-        string? serverPortStr = _settings.ReadSettings(IpConfig.serverPortconfigKey);
-        ServerPort = int.TryParse(serverPortStr, out int parsedServerPort) 
-            ? parsedServerPort 
+        // Leer del environment
+        ServerIp = Environment.GetEnvironmentVariable("SERVER_IP") ?? "127.0.0.1";
+        ServerPort = int.TryParse(Environment.GetEnvironmentVariable("SERVER_PORT"), out var sp)
+            ? sp
             : ProtocolConstants.DEFAULT_SERVER_PORT;
-        
-        ClientIp = _settings.ReadSettings(IpConfig.clientIPconfigKey) 
-                   ?? "127.0.0.1";
-        
-        string? clientPortStr = _settings.ReadSettings(IpConfig.clientPortconfigKey);
-        ClientPort = int.TryParse(clientPortStr, out int parsedClientPort) 
-            ? parsedClientPort 
+
+        ClientIp = Environment.GetEnvironmentVariable("CLIENT_IP") ?? "0.0.0.0";
+        ClientPort = int.TryParse(Environment.GetEnvironmentVariable("CLIENT_PORT"), out var cp)
+            ? cp
             : 0;
+
+        Console.WriteLine($"[DEBUG] SERVER_IP={ServerIp}, SERVER_PORT={ServerPort}");
+        Console.WriteLine($"[DEBUG] CLIENT_IP={ClientIp}, CLIENT_PORT={ClientPort}");
     }
-    
+
     /// <summary>
-    /// Gets the server endpoint
+    /// Obtiene el endpoint del servidor resolviendo nombres de host si es necesario
     /// </summary>
     public IPEndPoint GetServerEndPoint()
     {
-        Console.WriteLine($"SERVER IP {ServerIp} + SERVER PORT: {ServerPort}");
-        return new IPEndPoint(IPAddress.Parse(ServerIp), ServerPort);
+        Console.WriteLine($"SERVER IP/HOST {ServerIp} + SERVER PORT: {ServerPort}");
         
+        IPAddress ipAddress;
+
+        // Intentar parsear como IP; si falla, resolver como hostname
+        if (!IPAddress.TryParse(ServerIp, out ipAddress))
+        {
+            IPAddress[] addresses = Dns.GetHostAddresses(ServerIp);
+            if (addresses.Length == 0)
+                throw new Exception($"No se pudo resolver el host '{ServerIp}'");
+
+            ipAddress = addresses[0];
+        }
+
+        return new IPEndPoint(ipAddress, ServerPort);
     }
-    
+
     /// <summary>
-    /// Gets the local endpoint for client binding
+    /// Obtiene el endpoint local del cliente
     /// </summary>
     public IPEndPoint GetLocalEndPoint()
     {
-        Console.WriteLine($"CLIENT IP {ClientIp} + CLIENT PORT {ClientPort} + SERVER IP {ServerIp} + SERVER PORT: {ServerPort}");
-        return new IPEndPoint(IPAddress.Parse(ClientIp), ClientPort);
+        Console.WriteLine($"CLIENT IP {ClientIp} + CLIENT PORT {ClientPort}");
+        
+        IPAddress ipAddress;
+
+        if (!IPAddress.TryParse(ClientIp, out ipAddress))
+        {
+            IPAddress[] addresses = Dns.GetHostAddresses(ClientIp);
+            if (addresses.Length == 0)
+                throw new Exception($"No se pudo resolver el host '{ClientIp}'");
+
+            ipAddress = addresses[0];
+        }
+
+        return new IPEndPoint(ipAddress, ClientPort);
     }
+    public string ServerImageDirectory { get; set; } = "/app/Images";
+
 }

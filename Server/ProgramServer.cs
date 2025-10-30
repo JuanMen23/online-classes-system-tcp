@@ -11,7 +11,7 @@ var serverApp = new ServerApplication(config);
 
 try
 {
-    serverApp.Start();
+    await serverApp.StartAsync();
 }
 catch (Exception ex)
 {
