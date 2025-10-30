@@ -93,4 +93,6 @@ public class AppConfig
 
         return new IPEndPoint(ipAddress, ClientPort);
     }
+    public string ServerImageDirectory { get; set; } = "/app/Images";
+
 }
