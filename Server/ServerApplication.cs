@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using System.Threading.Tasks;
 using Common;
 using Common.Config;
 using Server.Services;
@@ -44,12 +45,8 @@ public class ServerApplication
             Console.WriteLine("Esperando clientes...");
             Console.WriteLine($"Escriba '{Common.Protocol.ProtocolConstants.EXIT_COMMAND}' para cerrar el servidor de forma controlada");
 
-            // StartAsync console command handler in a separate thread
-            var consoleThread = new Thread(HandleConsoleCommands)
-            {
-                IsBackground = true
-            };
-            consoleThread.Start();
+            // Start console command handler in a separate task
+            _ = Task.Run(HandleConsoleCommands);
 
             // Main server loop
             while (_isRunning)
