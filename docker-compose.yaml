@@ -8,12 +8,16 @@
       - obl-network
     volumes:
       - ./Server/Images:/app/Images   # accede a imágenes desde host
+      - ./Server/database.txt:/app/database.txt  # persistencia de datos
     ports:
       - "20000:20000"
+    stdin_open: true
+    tty: true
     environment:
       - SERVER_IP=0.0.0.0             # escucha en todas las interfaces dentro del contenedor
       - SERVER_PORT=20000
       - SERVER_IMAGE_DIRECTORY=/app/Images
+    entrypoint: ["sleep", "infinity"]  # Sobrescribe ENTRYPOINT del Dockerfile
     restart: "no"
 
   client1:
@@ -26,10 +30,30 @@
     stdin_open: true
     tty: true
     environment:
-      - SERVER_IP=server-container     # nombre del contenedor del server dentro de la red
+      - SERVER_IP=server     # nombre del servicio (resuelto por Docker DNS)
       - SERVER_PORT=20000
       - CLIENT_IP=0.0.0.0
       - CLIENT_PORT=0
+    entrypoint: ["sleep", "infinity"]
+    depends_on:
+      - server
+    restart: "no"
+
+  client2:
+    build:
+      context: .
+      dockerfile: Client/Dockerfile
+    container_name: client2
+    networks:
+      - obl-network
+    stdin_open: true
+    tty: true
+    environment:
+      - SERVER_IP=server     # nombre del servicio (resuelto por Docker DNS)
+      - SERVER_PORT=20000
+      - CLIENT_IP=0.0.0.0
+      - CLIENT_PORT=0
+    entrypoint: ["sleep", "infinity"]
     depends_on:
       - server
     restart: "no"
