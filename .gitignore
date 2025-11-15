@@ -5,6 +5,10 @@ obj/
 *.userosscache
 *.sln.docstates
 
+# Archivos compilados para Docker (no commitear)
+Server/out/
+Client/out/
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
