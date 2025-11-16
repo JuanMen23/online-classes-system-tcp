@@ -199,7 +199,7 @@ public class ClassService
 
             sb.AppendLine($"{c.Id}|{c.Name}|{c.Description}|" +
                           $"{c.StartDateTime:yyyy-MM-dd HH:mm}|{c.DurationMinutes} min|" +
-                          $"{enrolled}/{c.MaxSeats}|{hasImageFlag}");
+                          $"{enrolled}/{c.MaxSeats}|{hasImageFlag}|{c.Link}");
         }
 
         return new ProtocolMessage(
@@ -924,6 +924,32 @@ public class ClassService
             throw new FileNotFoundException($"El archivo de la imagen '{targetClass.ImagePath}' no se encontró en el servidor.");
         }
         return Convert.ToBase64String(imageBytes);
+    }
+
+    public ClassSession? GetClassByLink(string link)
+    {
+        if (string.IsNullOrWhiteSpace(link))
+        {
+            return null;
+        }
+
+        return _classes.Values.FirstOrDefault(c =>
+            c.Link.Equals(link, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public bool IsUserEnrolledInClass(int classId, string username)
+    {
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return false;
+        }
+
+        if (!_classes.TryGetValue(classId, out var targetClass))
+        {
+            return false;
+        }
+
+        return targetClass.IsEnrolled(username);
     }
     
     public void CreateClassFromData(

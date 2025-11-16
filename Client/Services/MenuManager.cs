@@ -143,12 +143,13 @@ public class MenuManager
             foreach (var line in classLines)
             {
                 var parts = line.Split('|');
-                if (parts.Length < 7) continue;
+                if (parts.Length < 8) continue;
 
-                // Format: 0:ID|1:Nombre|2:Desc|3:Fecha|4:Dur|5:Cupos|6:TieneImagen
+                // Format: 0:ID|1:Nombre|2:Desc|3:Fecha|4:Dur|5:Cupos|6:TieneImagen|7:Link
                 Console.WriteLine($"ID: {parts[0]} - {parts[1]} ({parts[5]})");
                 Console.WriteLine($"   Descripción: {parts[2]}");
                 Console.WriteLine($"   Inicio: {parts[3]} ({parts[4]})");
+                Console.WriteLine($"   Link: {parts[7]}");
 
                 // --- If it has an image available for download ---
                 if (parts[6] == "1")

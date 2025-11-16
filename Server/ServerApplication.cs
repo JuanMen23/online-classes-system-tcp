@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 using Common;
 using Common.Config;
+using Server.GrpcServices;
 using Server.Services;
 
 namespace Server;
@@ -18,6 +19,7 @@ public class ServerApplication
     private readonly ClientManager _clientManager;
     private readonly DailyReportService _reportService;
     private CancellationTokenSource _reportCancellationToken = new();
+    private readonly GrpcServerHost _grpcServerHost;
 
     /// <summary>
     /// Initializes a new instance of the ServerApplication
@@ -29,6 +31,7 @@ public class ServerApplication
         LoadDataFromFile();
         _clientManager = ClientManager.Instance;
         _reportService = new DailyReportService(ClassService.Instance, config.ServerImageDirectory);
+        _grpcServerHost = new GrpcServerHost(config);
 
     }
 
@@ -40,6 +43,7 @@ public class ServerApplication
         try
         {
             InitializeServer();
+            await _grpcServerHost.StartAsync();
             _isRunning = true;
             
             Console.WriteLine($"Servidor escuchando en {_config.ServerIp}:{_config.ServerPort}");
@@ -117,6 +121,14 @@ public class ServerApplication
         
         // Disconnect all clients first
         _clientManager.DisconnectAllClients();
+        try
+        {
+            _grpcServerHost.StopAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deteniendo el servidor gRPC: {ex.Message}");
+        }
         
         try
         {

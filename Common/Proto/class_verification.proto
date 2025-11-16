@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+option csharp_namespace = "Common.Proto";
+
+package common.proto;
+
+service ClassVerificationService {
+  rpc VerifyClassLink(ClassLinkRequest) returns (ClassLinkResponse);
+  rpc VerifyEnrollment(EnrollmentRequest) returns (EnrollmentResponse);
+}
+
+message ClassLinkRequest {
+  string link = 1;
+}
+
+message ClassLinkResponse {
+  bool valid = 1;
+  int32 classId = 2;
+  string className = 3;
+  string message = 4;
+}
+
+message EnrollmentRequest {
+  string username = 1;
+  int32 classId = 2;
+}
+
+message EnrollmentResponse {
+  bool enrolled = 1;
+  string message = 2;
+}
+

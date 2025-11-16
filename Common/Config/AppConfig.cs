@@ -30,6 +30,16 @@ public class AppConfig
     public int ClientPort { get; set; }
 
     /// <summary>
+    /// Hostname/IP para el servidor gRPC
+    /// </summary>
+    public string GrpcServerHost { get; set; } = "0.0.0.0";
+
+    /// <summary>
+    /// Puerto para el servidor gRPC
+    /// </summary>
+    public int GrpcServerPort { get; set; } = 50051;
+
+    /// <summary>
     /// Maximum number of queued connections
     /// </summary>
     public int MaxBacklogConnections { get; set; } = ProtocolConstants.MAX_BACKLOG_CONNECTIONS;
@@ -47,8 +57,14 @@ public class AppConfig
             ? cp
             : 0;
 
+        GrpcServerHost = Environment.GetEnvironmentVariable("GRPC_SERVER_HOST") ?? GrpcServerHost;
+        GrpcServerPort = int.TryParse(Environment.GetEnvironmentVariable("GRPC_SERVER_PORT"), out var gp)
+            ? gp
+            : GrpcServerPort;
+
         Console.WriteLine($"[DEBUG] SERVER_IP={ServerIp}, SERVER_PORT={ServerPort}");
         Console.WriteLine($"[DEBUG] CLIENT_IP={ClientIp}, CLIENT_PORT={ClientPort}");
+        Console.WriteLine($"[DEBUG] GRPC_HOST={GrpcServerHost}, GRPC_PORT={GrpcServerPort}");
     }
 
     /// <summary>
@@ -58,7 +74,7 @@ public class AppConfig
     {
         Console.WriteLine($"SERVER IP/HOST {ServerIp} + SERVER PORT: {ServerPort}");
         
-        IPAddress ipAddress;
+        IPAddress ipAddress = default!;
 
         // Intentar parsear como IP; si falla, resolver como hostname
         if (!IPAddress.TryParse(ServerIp, out ipAddress))
@@ -80,7 +96,7 @@ public class AppConfig
     {
         Console.WriteLine($"CLIENT IP {ClientIp} + CLIENT PORT {ClientPort}");
         
-        IPAddress ipAddress;
+        IPAddress ipAddress = default!;
 
         if (!IPAddress.TryParse(ClientIp, out ipAddress))
         {
