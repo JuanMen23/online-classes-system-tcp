@@ -1,14 +1,12 @@
-using System.Reflection;
-
-namespace Server.Services;
-
-using Server.Data;
 using System.Collections.Concurrent;
-using System.Collections.Generic; 
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using Common.Protocol;
-using Server.Services; 
+using Server.Data;
+
+namespace Server.Services;
 
 public class ClassService
 {
@@ -21,6 +19,28 @@ public class ClassService
     private readonly object _lockNextId = new object();
 
     private ClassService() { }
+
+    private void PublishClassLog(string evento, string? usuario, string mensaje, string nivel = "INFO", int? classId = null, Guid? clientId = null, Dictionary<string, string>? extra = null)
+    {
+        var metadata = extra != null ? new Dictionary<string, string>(extra) : new Dictionary<string, string>();
+
+        if (clientId.HasValue)
+        {
+            metadata["client_id"] = clientId.Value.ToString();
+        }
+
+        LoggingService.Instance.PublishLog(evento, usuario, mensaje, nivel, classId, metadata);
+    }
+
+    private ProtocolMessage BuildErrorResponse(string evento, string mensaje, Guid clientId, string? usuario = null, int? classId = null, Dictionary<string, string>? extra = null, string nivel = "WARN")
+    {
+        PublishClassLog(evento, usuario, mensaje, nivel, classId, clientId, extra);
+        return new ProtocolMessage(
+            ProtocolConstants.HEADER_RESPONSE,
+            ProtocolConstants.CMD_ERROR,
+            mensaje
+        );
+    }
 
     public ClassSession CreateClass(string name, string description, int maxSeats,
         DateTime startDateTime, int durationMinutes, string? imagePath, string createdBy)
@@ -80,26 +100,19 @@ public class ClassService
 
     public ProtocolMessage HandleCreateClass(string data, Guid clientId)
     {
-        // Verificar autenticación
         if (!UserService.Instance.IsUserLoggedIn(clientId))
         {
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_ERROR,
-                "Acción no permitida. Debes iniciar sesión primero."
-            );
+            return BuildErrorResponse("class_create_not_logged", "Acción no permitida. Debes iniciar sesión primero.", clientId);
         }
+
+        string? username = UserService.Instance.GetLoggedInUsername(clientId);
 
         try
         {
             var parts = data.Split('|');
             if (parts.Length < 5)
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Datos insuficientes para crear la clase"
-                );
+                return BuildErrorResponse("class_create_invalid_payload", "Datos insuficientes para crear la clase", clientId, username);
             }
 
             var name = parts[0];
@@ -107,45 +120,55 @@ public class ClassService
 
             if (!int.TryParse(parts[2], out var maxSeats) || maxSeats <= 0)
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Número de cupos inválido"
-                );
+                return BuildErrorResponse(
+                    "class_create_invalid_seats",
+                    "Número de cupos inválido",
+                    clientId,
+                    username,
+                    null,
+                    new Dictionary<string, string> { ["max_seats"] = parts[2] });
             }
+
             if (!DateTime.TryParse(parts[3], out var startDateTime))
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Fecha inválida"
-                );
+                return BuildErrorResponse("class_create_invalid_date", "Fecha inválida", clientId, username);
             }
+
             if (!int.TryParse(parts[4], out var durationMinutes) || durationMinutes <= 0)
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Duración inválida"
-                );
+                return BuildErrorResponse(
+                    "class_create_invalid_duration",
+                    "Duración inválida",
+                    clientId,
+                    username,
+                    null,
+                    new Dictionary<string, string> { ["duration"] = parts[4] });
             }
 
             var imageBase64 = parts.Length > 5 ? parts[5] : null;
 
-            // Obtener el nombre de usuario actual
-            var username = UserService.Instance.GetLoggedInUsername(clientId);
             if (string.IsNullOrEmpty(username))
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "No se pudo obtener el usuario actual"
-                );
+                return BuildErrorResponse("class_create_missing_user", "No se pudo obtener el usuario actual", clientId, username);
             }
 
             var createdClass = CreateClassWithDetails(
                 name, description, maxSeats, startDateTime, durationMinutes, imageBase64, username
             );
+
+            PublishClassLog(
+                "class_create_success",
+                username,
+                $"Clase '{createdClass.Name}' creada por {username}",
+                "INFO",
+                createdClass.Id,
+                clientId,
+                new Dictionary<string, string>
+                {
+                    ["max_seats"] = maxSeats.ToString(),
+                    ["start"] = startDateTime.ToString("o"),
+                    ["duration"] = durationMinutes.ToString()
+                });
 
             return new ProtocolMessage(
                 ProtocolConstants.HEADER_RESPONSE,
@@ -155,19 +178,11 @@ public class ClassService
         }
         catch (ArgumentException ex)
         {
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_ERROR,
-                ex.Message
-            );
+            return BuildErrorResponse("class_create_argument_error", ex.Message, clientId, username);
         }
         catch (Exception ex)
         {
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_ERROR,
-                $"Error inesperado: {ex.Message}"
-            );
+            return BuildErrorResponse("class_create_error", $"Error inesperado: {ex.Message}", clientId, username, null, null, "ERROR");
         }
     }
 

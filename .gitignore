@@ -8,6 +8,7 @@ obj/
 # Archivos compilados para Docker (no commitear)
 Server/out/
 Client/out/
+LogsServer/out/
 
 # Build results
 [Dd]ebug/
