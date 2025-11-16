@@ -1,4 +1,15 @@
 ﻿services:
+  logs-server:
+    build:
+      context: .
+      dockerfile: LogsServer/Dockerfile
+    container_name: logs-server-container
+    networks:
+      - obl-network
+    ports:
+      - "5001:5001"
+    restart: "no"
+
   server:
     build:
       context: .
