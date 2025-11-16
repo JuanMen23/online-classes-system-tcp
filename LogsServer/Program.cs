@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSingleton<ILogService, LogService>();
+builder.Services.AddHostedService<RabbitMQService>();
 
 // URL
 builder.WebHost.UseUrls("http://0.0.0.0:5001");

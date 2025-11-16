@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using LogsServer.Models;
 
 namespace LogsServer.Services;
@@ -33,16 +35,41 @@ public class LogService : ILogService
         return GetAll().Where(l => l.Evento.Equals(evento, StringComparison.OrdinalIgnoreCase));
     }
 
-    public IEnumerable<LogEntry> Filter(string? usuario = null, string? evento = null, int limit = 100)
+    public IEnumerable<LogEntry> Filter(LogFilterOptions options)
     {
+        if (options == null)
+            throw new ArgumentNullException(nameof(options));
+
         var query = GetAll();
 
-        if (!string.IsNullOrWhiteSpace(usuario))
-            query = query.Where(l => l.Usuario.Contains(usuario, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(options.Usuario))
+            query = query.Where(l => l.Usuario.Contains(options.Usuario, StringComparison.OrdinalIgnoreCase));
 
-        if (!string.IsNullOrWhiteSpace(evento))
-            query = query.Where(l => l.Evento.Contains(evento, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(options.Evento))
+            query = query.Where(l => l.Evento.Contains(options.Evento, StringComparison.OrdinalIgnoreCase));
 
+        if (!string.IsNullOrWhiteSpace(options.Nivel))
+            query = query.Where(l => l.Nivel.Equals(options.Nivel, StringComparison.OrdinalIgnoreCase));
+
+        if (options.ClaseId.HasValue)
+            query = query.Where(l => l.ClaseId == options.ClaseId);
+
+        if (options.Desde.HasValue)
+            query = query.Where(l => l.Timestamp >= options.Desde.Value);
+
+        if (options.Hasta.HasValue)
+            query = query.Where(l => l.Timestamp <= options.Hasta.Value);
+
+        if (!string.IsNullOrWhiteSpace(options.Contiene))
+        {
+            query = query.Where(l =>
+                l.Mensaje.Contains(options.Contiene, StringComparison.OrdinalIgnoreCase) ||
+                l.Metadata.Any(kvp =>
+                    kvp.Key.Contains(options.Contiene, StringComparison.OrdinalIgnoreCase) ||
+                    kvp.Value.Contains(options.Contiene, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        var limit = Math.Clamp(options.Limit, 1, 500);
         return query.Take(limit);
     }
 }

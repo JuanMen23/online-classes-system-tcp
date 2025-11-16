@@ -7,14 +7,15 @@ set -e
 echo "🔨 1. Compilando proyectos con código más reciente..."
 dotnet publish Server/Server.csproj -c Release -o Server/out
 dotnet publish Client/Client.csproj -c Release -o Client/out
+dotnet publish LogsServer/LogsServer.csproj -c Release -o LogsServer/out
 
 echo ""
-echo "🐳 2. Reconstruyendo imágenes Docker..."
+echo "🐳 2. Reconstruyendo imágenes Docker (sin caché)..."
 docker-compose build --no-cache
 
 echo ""
-echo "🛑 3. Deteniendo contenedores anteriores..."
-docker-compose down
+echo "🛑 3. Limpiando volúmenes y contenedores anteriores..."
+docker-compose down -v --remove-orphans
 
 echo ""
 echo "🚀 4. Levantando contenedores en background..."
@@ -27,20 +28,33 @@ echo "════════════════════════�
 echo "  PARA USAR DE FORMA INTERACTIVA"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
-echo "Abre 3 TERMINALES SEPARADAS y ejecuta en cada una:"
+echo "Abre 4+ TERMINALES SEPARADAS:"
 echo ""
-echo "📟 Terminal 1 - Servidor:"
+echo "📟 Terminal 1 - Ver LogsServer en VIVO:"
+echo "   docker-compose logs -f logs-server"
+echo ""
+echo "📟 Terminal 2 - Ver Servidor Principal en VIVO:"
+echo "   docker-compose logs -f server"
+echo ""
+echo "📟 Terminal 3 - Servidor (interactivo):"
 echo "   ./scripts/start-server.sh"
 echo ""
-echo "📟 Terminal 2 - Cliente 1:"
+echo "📟 Terminal 4 - Cliente 1 (interactivo):"
 echo "   ./scripts/start-client1.sh"
 echo ""
-echo "📟 Terminal 3 - Cliente 2:"
+echo "📟 Terminal 5 - Cliente 2 (interactivo):"
 echo "   ./scripts/start-client2.sh"
+echo ""
+echo "📟 Terminal 6 (OPCIONAL) - Ver LogsServer REST API:"
+echo "   curl -s http://localhost:5001/api/logs | jq ."
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
-echo "💡 Tip: Los contenedores están corriendo en background."
-echo "   Cuando ejecutes los scripts, se conectarán interactivamente."
+echo "🚀 RESUMEN DEL FLUJO:"
+echo "   1. T1 & T2: Ver logs en tiempo real"
+echo "   2. T3: Levantar servidor"
+echo "   3. T4: Hacer login/logout desde cliente"
+echo "   4. T1: Ver los logs llegando a LogsServer ✅"
+echo "   5. T6: Consultar REST API para ver logs guardados"
 echo ""
 

@@ -19,18 +19,29 @@ public class LogsController : ControllerBase
 
     /// <summary>Obtiene todos los logs con filtros opcionales</summary>
     [HttpGet]
-    public IActionResult GetLogs([FromQuery] string? usuario, [FromQuery] string? evento, [FromQuery] int limit = 100)
+    public IActionResult GetLogs([FromQuery] LogFilterOptions? filters)
     {
         try
         {
-            var logs = _logService.Filter(usuario, evento, limit).ToList();
-            _logger.LogInformation($"📊 Se consultaron {logs.Count} logs");
+            filters ??= new LogFilterOptions();
+            var logs = _logService.Filter(filters).ToList();
+            _logger.LogInformation($"📊 Se consultaron {logs.Count} logs con filtros {@filters}", filters);
 
             return Ok(new
             {
                 logs,
                 total = logs.Count,
-                filters = new { usuario, evento, limit }
+                filters = new
+                {
+                    filters.Usuario,
+                    filters.Evento,
+                    filters.Nivel,
+                    filters.ClaseId,
+                    Desde = filters.Desde,
+                    Hasta = filters.Hasta,
+                    Contiene = filters.Contiene,
+                    filters.Limit
+                }
             });
         }
         catch (Exception ex)

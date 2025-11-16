@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Net.Sockets;
 using Common.Protocol;
 using System.Threading.Tasks;
@@ -96,7 +97,7 @@ public class ClientHandler
             {
                 case ProtocolConstants.CMD_REGISTER:
                     var partsReg = message.Data.Split('|');
-                    responseData = _userService.RegisterUser(partsReg[0], partsReg[1]);
+                    responseData = _userService.RegisterUser(partsReg[0], partsReg[1], Id);
                     await SendResponseAsync(message.Command, responseData);
                     break;
 
@@ -119,36 +120,66 @@ public class ClientHandler
                 case ProtocolConstants.CMD_MODIFY_CLASS:
                     var modifyResponse = _classService.HandleModifyClass(message.Data, Id);
                     await _protocolHandler.SendMessageAsync(_clientSocket, modifyResponse);
+                    LogClassCommandResult("class_modify", modifyResponse, ExtractClassId(message.Data));
                     break;
 
                 case ProtocolConstants.CMD_LIST_CLASSES:
                     var listResponse = _classService.HandleListClasses();
                     await _protocolHandler.SendMessageAsync(_clientSocket, listResponse);
+                    var listCount = string.IsNullOrWhiteSpace(listResponse.Data)
+                        ? 0
+                        : listResponse.Data.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+                    LogClassCommandResult(
+                        "class_list",
+                        listResponse,
+                        null,
+                        new Dictionary<string, string> { ["count"] = listCount.ToString() },
+                        "Listado de clases consultado");
                     break;
 
                 case ProtocolConstants.CMD_ENROLL_CLASS:
                     var enrollResponse = _classService.HandleEnrollClass(message.Data, Id);
                     await _protocolHandler.SendMessageAsync(_clientSocket, enrollResponse);
+                    LogClassCommandResult("class_enroll", enrollResponse, ExtractClassId(message.Data));
                     break;
 
                 case ProtocolConstants.CMD_CANCEL_ENROLL:
                     var cancelResponse = _classService.HandleCancelEnrollment(message.Data, Id);
                     await _protocolHandler.SendMessageAsync(_clientSocket, cancelResponse);
+                    LogClassCommandResult("class_cancel_enroll", cancelResponse, ExtractClassId(message.Data));
                     break;
 
                 case ProtocolConstants.CMD_DELETE_CLASS:
                     var deleteResponse = _classService.HandleDeleteClass(message.Data, Id);
                     await _protocolHandler.SendMessageAsync(_clientSocket, deleteResponse);
+                    LogClassCommandResult("class_delete", deleteResponse, ExtractClassId(message.Data));
                     break;
                 
                 case ProtocolConstants.CMD_SEARCH_CLASSES:
                     var searchResponse = _classService.HandleSearchClasses(message.Data);
                     await _protocolHandler.SendMessageAsync(_clientSocket, searchResponse);
+                    var filters = message.Data.Split('|');
+                    var searchMetadata = new Dictionary<string, string>
+                    {
+                        ["keyword"] = filters.Length > 0 ? filters[0] : string.Empty,
+                        ["min_date"] = filters.Length > 1 ? filters[1] : string.Empty,
+                        ["max_date"] = filters.Length > 2 ? filters[2] : string.Empty,
+                        ["max_duration"] = filters.Length > 3 ? filters[3] : string.Empty
+                    };
+                    LogClassCommandResult("class_search", searchResponse, null, searchMetadata);
                     break;
                 
                 case ProtocolConstants.CMD_HISTORY:
                     var historyResponse = _classService.HandleHistory(Id);
                     await _protocolHandler.SendMessageAsync(_clientSocket, historyResponse);
+                    var historyCount = string.IsNullOrWhiteSpace(historyResponse.Data)
+                        ? 0
+                        : historyResponse.Data.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+                    LogClassCommandResult(
+                        "class_history",
+                        historyResponse,
+                        null,
+                        new Dictionary<string, string> { ["entries"] = historyCount.ToString() });
                     break;
                 
                 case ProtocolConstants.CMD_DOWNLOAD_IMAGE:
@@ -179,9 +210,26 @@ public class ClientHandler
 
             string imageBase64 = _classService.GetClassImageAsBase64(classId);
             await SendResponseAsync(message.Command, imageBase64);
+            var username = _userService.GetLoggedInUsername(Id) ?? "guest";
+            LoggingService.Instance.PublishLog(
+                "image_download_success",
+                username,
+                $"Descargó imagen de la clase {classId}",
+                "INFO",
+                classId,
+                new Dictionary<string, string>
+                {
+                    ["client_id"] = Id.ToString()
+                });
         }
         catch (Exception ex)
         {
+            LoggingService.Instance.PublishLog(
+                "image_download_error",
+                _userService.GetLoggedInUsername(Id) ?? "guest",
+                ex.Message,
+                "WARN",
+                metadata: new Dictionary<string, string> { ["client_id"] = Id.ToString() });
             await SendErrorResponseAsync(ex.Message);
         }
     }
@@ -259,5 +307,38 @@ public class ClientHandler
         {
             _clientSocket.Close();
         }
+    }
+
+    private static int? ExtractClassId(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return null;
+        }
+
+        var separatorIndex = payload.IndexOf('|');
+        var candidate = separatorIndex >= 0 ? payload[..separatorIndex] : payload;
+
+        return int.TryParse(candidate, out var classId) ? classId : null;
+    }
+
+    private void LogClassCommandResult(string eventoBase, ProtocolMessage response, int? classId = null, Dictionary<string, string>? extra = null, string? customMessage = null)
+    {
+        var metadata = extra != null ? new Dictionary<string, string>(extra) : new Dictionary<string, string>();
+        metadata["client_id"] = Id.ToString();
+
+        if (classId.HasValue)
+        {
+            metadata["class_id"] = classId.Value.ToString();
+        }
+
+        var success = response.Command != ProtocolConstants.CMD_ERROR &&
+                      !response.Data.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase);
+
+        var evento = success ? $"{eventoBase}_success" : $"{eventoBase}_error";
+        var nivel = success ? "INFO" : "WARN";
+        var usuario = _userService.GetLoggedInUsername(Id) ?? "guest";
+
+        LoggingService.Instance.PublishLog(evento, usuario, customMessage ?? response.Data, nivel, classId, metadata);
     }
 }

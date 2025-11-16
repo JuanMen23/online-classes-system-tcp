@@ -20,6 +20,6 @@ public interface ILogService
     IEnumerable<LogEntry> FilterByEvento(string evento);
 
     /// <summary>Filtra logs con múltiples criterios</summary>
-    IEnumerable<LogEntry> Filter(string? usuario = null, string? evento = null, int limit = 100);
+    IEnumerable<LogEntry> Filter(LogFilterOptions options);
 }
 

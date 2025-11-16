@@ -1,4 +1,22 @@
 ﻿services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq-container
+    networks:
+      - obl-network
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: "no"
+
   logs-server:
     build:
       context: .
@@ -8,6 +26,14 @@
       - obl-network
     ports:
       - "5001:5001"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=admin
+      - RABBITMQ_PASSWORD=admin
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     restart: "no"
 
   server:
@@ -25,10 +51,14 @@
     stdin_open: true
     tty: true
     environment:
-      - SERVER_IP=0.0.0.0             # escucha en todas las interfaces dentro del contenedor
+      - SERVER_IP=0.0.0.0
       - SERVER_PORT=20000
       - SERVER_IMAGE_DIRECTORY=/app/Images
-    entrypoint: ["sleep", "infinity"]  # Sobrescribe ENTRYPOINT del Dockerfile
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=admin
+      - RABBITMQ_PASSWORD=admin
+    entrypoint: ["sleep", "infinity"]
     restart: "no"
 
   client1:

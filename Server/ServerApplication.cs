@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Common;
@@ -44,6 +45,16 @@ public class ServerApplication
             Console.WriteLine($"Servidor escuchando en {_config.ServerIp}:{_config.ServerPort}");
             Console.WriteLine("Esperando clientes...");
             Console.WriteLine($"Escriba '{Common.Protocol.ProtocolConstants.EXIT_COMMAND}' para cerrar el servidor de forma controlada");
+            LoggingService.Instance.PublishLog(
+                "server_start",
+                "system",
+                $"Servidor escuchando en {_config.ServerIp}:{_config.ServerPort}",
+                metadata: new Dictionary<string, string>
+                {
+                    ["ip"] = _config.ServerIp,
+                    ["port"] = _config.ServerPort.ToString(),
+                    ["backlog"] = _config.MaxBacklogConnections.ToString()
+                });
 
             // Start console command handler in a separate task
             _ = Task.Run(HandleConsoleCommands);
@@ -71,6 +82,11 @@ public class ServerApplication
                     if (_isRunning)
                     {
                         Console.WriteLine($"Error aceptando conexión de cliente: {ex.Message}");
+                        LoggingService.Instance.PublishLog(
+                            "client_accept_error",
+                            "system",
+                            ex.Message,
+                            "ERROR");
                     }
                 }
             }
@@ -78,6 +94,11 @@ public class ServerApplication
         catch (Exception ex)
         {
             Console.WriteLine($"Error al iniciar el servidor: {ex.Message}");
+            LoggingService.Instance.PublishLog(
+                "server_start_error",
+                "system",
+                ex.Message,
+                "ERROR");
         }
         finally { Stop();}
     }
@@ -111,6 +132,10 @@ public class ServerApplication
         }
         
         Console.WriteLine("Servidor cerrado");
+        LoggingService.Instance.PublishLog(
+            "server_stop",
+            "system",
+            "Servidor detenido correctamente");
     }
 
     /// <summary>
@@ -133,11 +158,20 @@ public class ServerApplication
                 {
                     case Common.Protocol.ProtocolConstants.EXIT_COMMAND:
                         Console.WriteLine("Iniciando cierre controlado del servidor...");
+                        LoggingService.Instance.PublishLog(
+                            "console_exit",
+                            "system",
+                            "Se recibió el comando EXIT");
                         Stop();
                         return;
 
                     case "REPORT":
                         Console.WriteLine("Generando reporte del día... (presione C para cancelar)");
+
+                        LoggingService.Instance.PublishLog(
+                            "report_requested",
+                            "system",
+                            "Solicitud de reporte manual recibida");
 
                         var reportTask = _reportService.GenerateReportAsync(_reportCancellationToken.Token);
 
@@ -147,6 +181,10 @@ public class ServerApplication
                             {
                                 _reportCancellationToken.Cancel();
                                 Console.WriteLine("Cancelando reporte...");
+                                LoggingService.Instance.PublishLog(
+                                    "report_cancelled",
+                                    "system",
+                                    "Reporte cancelado por el operador");
                                 break;
                             }
                             Thread.Sleep(200);
@@ -154,7 +192,16 @@ public class ServerApplication
 
                         if (!_reportCancellationToken.IsCancellationRequested)
                         {
-                            Console.WriteLine(await reportTask);
+                            var reportResult = await reportTask;
+                            Console.WriteLine(reportResult);
+                            LoggingService.Instance.PublishLog(
+                                "report_generated",
+                                "system",
+                                "Reporte generado correctamente",
+                                metadata: new Dictionary<string, string>
+                                {
+                                    ["summary"] = reportResult.Replace(Environment.NewLine, " | ")
+                                });
                         }
                         else
                         {
@@ -166,6 +213,11 @@ public class ServerApplication
 
                     default:
                         Console.WriteLine($"Comando desconocido: '{input}'. Escriba 'EXIT' o 'REPORT'.");
+                        LoggingService.Instance.PublishLog(
+                            "console_unknown_command",
+                            "system",
+                            $"Comando desconocido recibido: {input}",
+                            "WARN");
                         break;
                 }
 
@@ -173,6 +225,11 @@ public class ServerApplication
             catch (Exception ex)
             {
                 Console.WriteLine($"Error procesando comando: {ex.Message}");
+                LoggingService.Instance.PublishLog(
+                    "console_command_error",
+                    "system",
+                    ex.Message,
+                    "ERROR");
             }
         }
     }
@@ -201,6 +258,11 @@ public class ServerApplication
         if (!File.Exists(filePath))
         {
             PrintMessage.Information($"Advertencia: No se encontró el archivo de datos ({filePath}). El servidor iniciará vacío.");
+            LoggingService.Instance.PublishLog(
+                "data_file_missing",
+                "system",
+                $"No se encontró el archivo de datos en {filePath}",
+                "WARN");
             return;
         }
 
@@ -225,7 +287,7 @@ public class ServerApplication
                     var username = parts[1];
                     var password = parts[2];
                     
-                    UserService.Instance.RegisterUser(username, password); 
+                    UserService.Instance.RegisterUser(username, password, null, emitLog: false); 
                     usersLoaded++;
                 }
                 else if (type == "CLASS" && parts.Length >= 9)
@@ -253,10 +315,24 @@ public class ServerApplication
 
             ClassService.Instance.SetNextId(maxClassId + 1);
             PrintMessage.Success($"Datos cargados desde {filePath}: {usersLoaded} usuarios y {classesLoaded} clases.");
+            LoggingService.Instance.PublishLog(
+                "data_loaded",
+                "system",
+                $"Datos cargados desde {filePath}",
+                metadata: new Dictionary<string, string>
+                {
+                    ["users"] = usersLoaded.ToString(),
+                    ["classes"] = classesLoaded.ToString()
+                });
         }
         catch (Exception ex)
         {
             PrintMessage.Error($"Error al cargar datos desde {filePath}: {ex.Message}");
+            LoggingService.Instance.PublishLog(
+                "data_load_error",
+                "system",
+                ex.Message,
+                "ERROR");
         }
     }
 }
