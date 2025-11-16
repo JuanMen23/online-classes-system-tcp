@@ -132,4 +132,15 @@ public class UserService
     {
          return _activeSessions.TryGetValue(clientId, out string? username) ? username : null;
     }
+
+    public bool ValidateCredentials(string username, string password)
+    {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            return false;
+        }
+
+        return _registeredUsers.TryGetValue(username, out var user) &&
+               user.Password == password;
+    }
 }

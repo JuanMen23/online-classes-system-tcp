@@ -9,6 +9,8 @@ obj/
 Server/out/
 Client/out/
 LogsServer/out/
+ChatServer/out/
+ChatClient/out/
 
 # Build results
 [Dd]ebug/
