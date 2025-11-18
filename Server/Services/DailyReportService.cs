@@ -39,59 +39,19 @@ namespace Server.Services
                     if (token.IsCancellationRequested)
                         state.Stop();
 
-                    // Inscriptos
                     Interlocked.Add(ref totalInscriptos, clase.EnrolledCount);
+                    Interlocked.Add(ref clasesConImagen, File.Exists(Path.Combine(_imageDirectory, clase.ImagePath ?? "")) ? 1 : 0);
 
-                    var imagePath = clase.ImagePath;
-
-                    if (!string.IsNullOrEmpty(imagePath))
-                    {
-                        // 1) Normalizar separadores a estilo POSIX (evita problemas mixtos Windows/Linux)
-                        imagePath = imagePath.Replace('\\', '/');
-
-                        // 2) Si viene con prefijo "Images/" lo removemos para evitar duplicados
-                        if (imagePath.StartsWith("Images/", StringComparison.OrdinalIgnoreCase))
-                        {
-                            imagePath = imagePath.Substring("Images/".Length).TrimStart('/', '\\');
-                        }
-
-                        string fullPath;
-                        if (Path.IsPathRooted(imagePath))
-                        {
-                            // Si ya es absoluta, normalizar y usarla tal cual
-                            fullPath = Path.GetFullPath(imagePath);
-                        }
-                        else
-                        {
-                            // Combinar con el directorio configurado y normalizar
-                            fullPath = Path.Combine(_imageDirectory, imagePath);
-                            fullPath = Path.GetFullPath(fullPath);
-                        }
-
-                        Console.WriteLine($"DEBUG ORIGINAL IMAGEPATH = '{clase.ImagePath}'");
-                        Console.WriteLine($"DEBUG NORMALIZED IMAGEPATH = '{imagePath}'");
-                        Console.WriteLine($"DEBUG IMAGEDIR  = '{_imageDirectory}'");
-                        Console.WriteLine($"DEBUG FULL PATH = '{fullPath}'");
-                        Console.WriteLine($"FILE EXISTS? {File.Exists(fullPath)}");
-
-                        if (File.Exists(fullPath))
-                        {
-                            Interlocked.Increment(ref clasesConImagen);
-                            Interlocked.Add(ref totalTamañoImagenes, new FileInfo(fullPath).Length);
-                        }
-                    }
-
+                    var path = Path.Combine(_imageDirectory, clase.ImagePath ?? "");
+                    if (File.Exists(path))
+                        Interlocked.Add(ref totalTamañoImagenes, new FileInfo(path).Length);
                 });
 
                 promedioDuracion = classes.Average(c => c.DurationMinutes);
-
             }, token);
 
-
             double promedioInscriptos = totalInscriptos / (double)totalClases;
-            double promedioTamañoImagenes = clasesConImagen > 0
-                ? totalTamañoImagenes / (double)clasesConImagen
-                : 0;
+            double promedioTamañoImagenes = clasesConImagen > 0 ? totalTamañoImagenes / (double)clasesConImagen : 0;
 
             return
                 "📅 REPORTE DE CLASES DEL DÍA\n" +
@@ -103,6 +63,5 @@ namespace Server.Services
                 $"Tamaño total de imágenes: {totalTamañoImagenes / 1024.0:F2} KB\n" +
                 $"Promedio de tamaño de imágenes: {promedioTamañoImagenes / 1024.0:F2} KB";
         }
-
     }
 }
