@@ -40,15 +40,45 @@ namespace Server.Services
                         state.Stop();
 
                     Interlocked.Add(ref totalInscriptos, clase.EnrolledCount);
-                    Interlocked.Add(ref clasesConImagen, File.Exists(Path.Combine(_imageDirectory, clase.ImagePath ?? "")) ? 1 : 0);
 
-                    var path = Path.Combine(_imageDirectory, clase.ImagePath ?? "");
-                    if (File.Exists(path))
-                        Interlocked.Add(ref totalTamañoImagenes, new FileInfo(path).Length);
+                    var imagePath = clase.ImagePath;
+                    if (!string.IsNullOrEmpty(imagePath))
+                    {
+                        // Normalizar separadores a estilo del SO
+                        imagePath = imagePath.Replace('\\', '/');
+
+                        // Si viene con "Images/..." quitar ese prefijo por si guardaron mal
+                        if (imagePath.StartsWith("Images/", StringComparison.OrdinalIgnoreCase))
+                            imagePath = imagePath.Substring("Images/".Length).TrimStart('/', '\\');
+
+                        string fullPath;
+                        if (Path.IsPathRooted(imagePath))
+                        {
+                            fullPath = Path.GetFullPath(imagePath);
+                        }
+                        else
+                        {
+                            // usar el directorio que se pasó por configuración (por ejemplo "/app/Images")
+                            fullPath = Path.Combine(_imageDirectory, imagePath);
+                            fullPath = Path.GetFullPath(fullPath);
+                        }
+
+                        Console.WriteLine($"DEBUG ORIGINAL IMAGEPATH = '{clase.ImagePath}'");
+                        Console.WriteLine($"DEBUG NORMALIZED IMAGEPATH = '{imagePath}'");
+                        Console.WriteLine($"DEBUG FULL PATH = '{fullPath}'");
+                        Console.WriteLine($"FILE EXISTS? {File.Exists(fullPath)}");
+
+                        if (File.Exists(fullPath))
+                        {
+                            Interlocked.Increment(ref clasesConImagen);
+                            Interlocked.Add(ref totalTamañoImagenes, new FileInfo(fullPath).Length);
+                        }
+                    }
                 });
 
                 promedioDuracion = classes.Average(c => c.DurationMinutes);
             }, token);
+
 
             double promedioInscriptos = totalInscriptos / (double)totalClases;
             double promedioTamañoImagenes = clasesConImagen > 0 ? totalTamañoImagenes / (double)clasesConImagen : 0;

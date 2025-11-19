@@ -61,7 +61,7 @@
       - RABBITMQ_PORT=5672
       - RABBITMQ_USERNAME=admin
       - RABBITMQ_PASSWORD=admin
-    entrypoint: ["sleep", "infinity"]
+      # entrypoint: ["sleep", "infinity"]
     restart: "no"
 
   client1:
