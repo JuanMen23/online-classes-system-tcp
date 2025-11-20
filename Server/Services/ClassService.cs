@@ -75,9 +75,6 @@ public class ClassService
         {
             try
             {
-                Console.WriteLine("DEBUG: CreateClassWithDetails llamado");
-                Console.WriteLine($"DEBUG: imageBase64 null? {imageBase64 == null}");
-                Console.WriteLine($"DEBUG: imageBase64 length: {imageBase64?.Length ?? 0}");
                 byte[] imageBytes = Convert.FromBase64String(imageBase64);
 
                 // Directorio absoluto dentro del servidor (funciona en Windows y Docker)
@@ -86,12 +83,10 @@ public class ClassService
 
                 string fileName = $"{Guid.NewGuid()}.png";
                 var fullPath = Path.Combine(imagesDir, fileName);
-                Console.WriteLine($"DEBUG: saving image in {fullPath}");
                 File.WriteAllBytes(fullPath, imageBytes);
 
                 // Guardar SOLO el filename (no la carpeta)
                 imagePath = fileName;
-                Console.WriteLine($"DEBUG: image saved, size = {new FileInfo(fullPath).Length} bytes");
             }
             catch (FormatException)
             {

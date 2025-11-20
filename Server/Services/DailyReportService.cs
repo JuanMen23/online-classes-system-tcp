@@ -63,9 +63,6 @@ namespace Server.Services
                             fullPath = Path.GetFullPath(fullPath);
                         }
 
-                        Console.WriteLine($"DEBUG ORIGINAL IMAGEPATH = '{clase.ImagePath}'");
-                        Console.WriteLine($"DEBUG NORMALIZED IMAGEPATH = '{imagePath}'");
-                        Console.WriteLine($"DEBUG FULL PATH = '{fullPath}'");
                         Console.WriteLine($"FILE EXISTS? {File.Exists(fullPath)}");
 
                         if (File.Exists(fullPath))
