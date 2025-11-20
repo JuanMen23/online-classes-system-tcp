@@ -272,15 +272,42 @@ public class ResponseHandler
         {
             byte[] imageBytes = Convert.FromBase64String(response.Data);
 
-            string downloadsPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            downloadsPath = Path.Combine(downloadsPath, "Downloads");
+            var candidateRoots = new List<string?>
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                AppContext.BaseDirectory,
+                Directory.GetCurrentDirectory()
+            };
 
-            string fileName = $"clase_imagen_{Guid.NewGuid()}.png";
-            string fullPath = Path.Combine(downloadsPath, fileName);
+            string? savedPath = null;
+            Exception? lastError = null;
 
-            File.WriteAllBytes(fullPath, imageBytes);
+            foreach (var root in candidateRoots.Where(r => !string.IsNullOrWhiteSpace(r)))
+            {
+                try
+                {
+                    string downloadsPath = Path.Combine(root!, "Downloads");
+                    Directory.CreateDirectory(downloadsPath);
 
-            PrintMessage.Success($"Imagen descargada exitosamente en: {fullPath}");
+                    string fileName = $"clase_imagen_{Guid.NewGuid()}.png";
+                    string fullPath = Path.Combine(downloadsPath, fileName);
+
+                    File.WriteAllBytes(fullPath, imageBytes);
+                    savedPath = fullPath;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
+                }
+            }
+
+            if (savedPath == null)
+            {
+                throw new IOException("No se pudo determinar una ruta válida para guardar la imagen.", lastError);
+            }
+
+            PrintMessage.Success($"Imagen descargada exitosamente en: {savedPath}");
         }
         catch (FormatException)
         {
