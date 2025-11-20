@@ -62,9 +62,6 @@ public class AppConfig
             ? gp
             : GrpcServerPort;
 
-        Console.WriteLine($"[DEBUG] SERVER_IP={ServerIp}, SERVER_PORT={ServerPort}");
-        Console.WriteLine($"[DEBUG] CLIENT_IP={ClientIp}, CLIENT_PORT={ClientPort}");
-        Console.WriteLine($"[DEBUG] GRPC_HOST={GrpcServerHost}, GRPC_PORT={GrpcServerPort}");
     }
 
     /// <summary>

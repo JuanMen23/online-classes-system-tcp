@@ -58,6 +58,13 @@ docker-compose logs -f     # Ver logs
 docker-compose down        # Detener todo
 ```
 
+## Transferencia de imágenes (clientes ↔ servidor)
+
+- Las carpetas `Client/Uploads` y `Client/Downloads` del host están montadas dentro de cada cliente Docker como `/app/Uploads` y `/app/Downloads`.
+- Para **subir** una imagen al servidor, copia el archivo a `Client/Uploads` y, en la UI del cliente, indica solo el nombre del archivo (por ejemplo `historia.png`). También puedes poner rutas absolutas dentro del contenedor (por ejemplo `/app/Uploads/historia.png`).
+- Para **descargar** imágenes, el cliente las guardará automáticamente en `/app/Downloads`, por lo que aparecerán en `Client/Downloads` del host. El destino puede personalizarse con la variable `CLIENT_DOWNLOAD_DIR`.
+- Si necesitas cambiar las rutas internas, ajusta `CLIENT_UPLOAD_DIR` o `CLIENT_DOWNLOAD_DIR` en `docker-compose.yaml`.
+
 ## Solución de problemas
 
 **Los cambios no se reflejan:**

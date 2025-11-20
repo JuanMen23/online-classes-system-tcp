@@ -76,25 +76,30 @@ public class ClassService
             try
             {
                 byte[] imageBytes = Convert.FromBase64String(imageBase64);
-                
-                // Creates the Image folder on the Server if it doesn't exist
-                Directory.CreateDirectory("Images"); 
-                
+
+                // Directorio absoluto dentro del servidor (funciona en Windows y Docker)
+                var imagesDir = Path.Combine(AppContext.BaseDirectory, "Images");
+                Directory.CreateDirectory(imagesDir);
+
                 string fileName = $"{Guid.NewGuid()}.png";
-                imagePath = Path.Combine("Images", fileName);
-                File.WriteAllBytes(imagePath, imageBytes);
+                var fullPath = Path.Combine(imagesDir, fileName);
+                File.WriteAllBytes(fullPath, imageBytes);
+
+                // Guardar SOLO el filename (no la carpeta)
+                imagePath = fileName;
             }
             catch (FormatException)
             {
                 throw new ArgumentException("Formato de imagen Base64 inválido");
             }
         }
-        
+
         var createdClass = CreateClass(name, description, maxSeats, startDateTime, durationMinutes, imagePath, createdBy);
-        
-        Console.WriteLine($"Clase creada: {createdClass.Id} ({createdClass.Name}) por {createdBy}");
+
+        Console.WriteLine($"Clase creada: {createdClass.Id} ({createdClass.Name}) por {createdClass.CreatedBy}");
         return createdClass;
     }
+
 
     public IEnumerable<ClassSession> GetAllClasses() => _classes.Values.ToList();
 
@@ -893,38 +898,49 @@ public class ClassService
     
     public string GetClassImageAsBase64(int classId)
     {
-        // 1. Search for the class
         if (!_classes.TryGetValue(classId, out var targetClass))
-        {
             throw new ArgumentException("Clase no encontrada");
-        }
 
-        // 2. Verify if the class has an image associated
         if (string.IsNullOrEmpty(targetClass.ImagePath))
-        {
             throw new InvalidOperationException("Esta clase no tiene una imagen asociada.");
-        }
-        
-        // 3. Read the file and convert it to Base64
+
         byte[]? imageBytes = null;
-        
-        // Try to read as embedded resource first (for old images)
+
+        // Embedded resource (viejas imágenes)
         if (targetClass.ImagePath.StartsWith("Server.Images."))
         {
             imageBytes = ReadEmbeddedResource(targetClass.ImagePath);
         }
-        // Try to read as file path (for new images)
-        else if (File.Exists(targetClass.ImagePath))
+        else
         {
-            imageBytes = File.ReadAllBytes(targetClass.ImagePath);
+            var imagesDir = "/app/Images"; // Docker
+            if (!Directory.Exists(imagesDir))
+            {
+                // Modo local (Rider/Windows)
+                imagesDir = Path.Combine(AppContext.BaseDirectory, "Images");
+            }
+
+            var fileName = Path.GetFileName(targetClass.ImagePath);
+            var fullPath = Path.Combine(imagesDir, fileName);
+
+            if (File.Exists(fullPath))
+            {
+                imageBytes = File.ReadAllBytes(fullPath);
+            }
+
         }
 
-        if (imageBytes == null)
+        if (imageBytes == null || imageBytes.Length == 0)
         {
-            throw new FileNotFoundException($"El archivo de la imagen '{targetClass.ImagePath}' no se encontró en el servidor.");
+            throw new FileNotFoundException(
+                $"El archivo de la imagen '{targetClass.ImagePath}' no se encontró o está vacío. " +
+                $"Buscado en: {Path.Combine(AppContext.BaseDirectory, "Images")}"
+            );
         }
+
         return Convert.ToBase64String(imageBytes);
     }
+
 
     public ClassSession? GetClassByLink(string link)
     {
