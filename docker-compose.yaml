@@ -71,6 +71,9 @@
     container_name: client1
     networks:
       - obl-network
+    volumes:
+      - ./Client/Downloads:/app/Downloads
+      - ./Client/Uploads:/app/Uploads
     stdin_open: true
     tty: true
     environment:
@@ -78,6 +81,8 @@
       - SERVER_PORT=20000
       - CLIENT_IP=0.0.0.0
       - CLIENT_PORT=0
+      - CLIENT_DOWNLOAD_DIR=/app/Downloads
+      - CLIENT_UPLOAD_DIR=/app/Uploads
     entrypoint: ["sleep", "infinity"]
     depends_on:
       - server
@@ -90,6 +95,9 @@
     container_name: client2
     networks:
       - obl-network
+    volumes:
+      - ./Client/Downloads:/app/Downloads
+      - ./Client/Uploads:/app/Uploads
     stdin_open: true
     tty: true
     environment:
@@ -97,6 +105,8 @@
       - SERVER_PORT=20000
       - CLIENT_IP=0.0.0.0
       - CLIENT_PORT=0
+      - CLIENT_DOWNLOAD_DIR=/app/Downloads
+      - CLIENT_UPLOAD_DIR=/app/Uploads
     entrypoint: ["sleep", "infinity"]
     depends_on:
       - server

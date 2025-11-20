@@ -1,6 +1,8 @@
 using Common;
 using Common.Protocol;
 using Common.Config;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Client.Services;
 
@@ -271,43 +273,36 @@ public class ResponseHandler
         try
         {
             byte[] imageBytes = Convert.FromBase64String(response.Data);
-
-            var candidateRoots = new List<string?>
-            {
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                AppContext.BaseDirectory,
-                Directory.GetCurrentDirectory()
-            };
-
-            string? savedPath = null;
+            var downloadTargets = GetDownloadTargets();
             Exception? lastError = null;
 
-            foreach (var root in candidateRoots.Where(r => !string.IsNullOrWhiteSpace(r)))
+            foreach (var target in downloadTargets)
             {
+                var (downloadsPath, description) = target;
                 try
                 {
-                    string downloadsPath = Path.Combine(root!, "Downloads");
+                    PrintMessage.Information($"Intentando guardar imagen en '{downloadsPath}' ({description})...");
                     Directory.CreateDirectory(downloadsPath);
 
                     string fileName = $"clase_imagen_{Guid.NewGuid()}.png";
                     string fullPath = Path.Combine(downloadsPath, fileName);
 
                     File.WriteAllBytes(fullPath, imageBytes);
-                    savedPath = fullPath;
-                    break;
+
+                    PrintMessage.Success($"Imagen descargada exitosamente en: {fullPath}");
+                    return;
                 }
                 catch (Exception ex)
                 {
                     lastError = ex;
+                    PrintMessage.Information($"No se pudo guardar en '{downloadsPath}': {ex.Message}");
                 }
             }
 
-            if (savedPath == null)
-            {
-                throw new IOException("No se pudo determinar una ruta válida para guardar la imagen.", lastError);
-            }
-
-            PrintMessage.Success($"Imagen descargada exitosamente en: {savedPath}");
+            throw new IOException(
+                "No se pudo guardar la imagen en ningún directorio. " +
+                "Configura CLIENT_DOWNLOAD_DIR o verifica los volúmenes del contenedor.",
+                lastError);
         }
         catch (FormatException)
         {
@@ -317,5 +312,23 @@ public class ResponseHandler
         {
             PrintMessage.Error($"Error al guardar la imagen: {ex.Message}");
         }
+    }
+
+    private IEnumerable<(string path, string description)> GetDownloadTargets()
+    {
+        string? envDir = Environment.GetEnvironmentVariable("CLIENT_DOWNLOAD_DIR");
+        if (!string.IsNullOrWhiteSpace(envDir))
+        {
+            yield return (envDir, "CLIENT_DOWNLOAD_DIR");
+        }
+
+        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(userProfile))
+        {
+            yield return (Path.Combine(userProfile, "Downloads"), "perfil de usuario");
+        }
+
+        yield return (Path.Combine(AppContext.BaseDirectory, "Downloads"), "directorio de la app");
+        yield return (Path.Combine(Directory.GetCurrentDirectory(), "Downloads"), "directorio de trabajo");
     }
 }
