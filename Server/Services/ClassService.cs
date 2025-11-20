@@ -228,8 +228,12 @@ public class ClassService
 
         try
         {
+            var parts = data.Split('|');
+            string classIdStr = parts[0];
+            string? webhookUrl = parts.Length > 1 ? parts[1] : null;
+
             // Parsear el ID de la clase
-            if (!int.TryParse(data, out var classId))
+            if (!int.TryParse(classIdStr, out var classId)) // Usar classIdStr
             {
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
@@ -288,7 +292,13 @@ public class ClassService
                 // Inscribir al usuario de forma atómica
                 targetClass.EnrollUser(username);
 
-                Console.WriteLine($"Usuario '{username}' inscrito en clase '{targetClass.Name}' (ID: {targetClass.Id})");
+                var enrollment = targetClass.Enrollments.FirstOrDefault(e => e.Username == username && !e.IsCancelled);
+                if (enrollment != null)
+                {
+                    enrollment.WebhookUrl = webhookUrl;
+                }
+                
+                Console.WriteLine($"Usuario '{username}' inscrito en clase '{targetClass.Name}' con Webhook: {webhookUrl ?? "N/A"}");
 
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,

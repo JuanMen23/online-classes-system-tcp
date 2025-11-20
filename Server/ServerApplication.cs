@@ -20,6 +20,8 @@ public class ServerApplication
     private readonly DailyReportService _reportService;
     private CancellationTokenSource _reportCancellationToken = new();
     private readonly GrpcServerHost _grpcServerHost;
+    private readonly WebhookNotificationService _webhookService;
+    private CancellationTokenSource _cts = new();
 
     /// <summary>
     /// Initializes a new instance of the ServerApplication
@@ -31,8 +33,8 @@ public class ServerApplication
         LoadDataFromFile();
         _clientManager = ClientManager.Instance;
         _reportService = new DailyReportService(ClassService.Instance, config.ServerImageDirectory);
+        _webhookService = new WebhookNotificationService(ClassService.Instance);
         _grpcServerHost = new GrpcServerHost(config);
-
     }
 
     /// <summary>
@@ -44,6 +46,9 @@ public class ServerApplication
         {
             InitializeServer();
             await _grpcServerHost.StartAsync();
+            
+            _ = Task.Run(() => _webhookService.StartAsync(_cts.Token));
+            
             _isRunning = true;
             
             Console.WriteLine($"Servidor escuchando en {_config.ServerIp}:{_config.ServerPort}");
@@ -118,6 +123,8 @@ public class ServerApplication
         }
         
         _isRunning = false;
+        
+        _cts.Cancel();
         
         // Disconnect all clients first
         _clientManager.DisconnectAllClients();
