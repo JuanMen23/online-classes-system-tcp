@@ -174,13 +174,18 @@ public class MenuManager
     }
 
     /// <summary>
-    /// Prompts for class enrollment
+    /// Prompts for class enrollment with optional Webhook
     /// </summary>
-    /// <returns>Class ID as string</returns>
-    public string PromptClassEnrollment()
+    /// <returns>Tuple with Class ID and Webhook URL</returns>
+    public (string classId, string webhookUrl) PromptClassEnrollment()
     {
         Console.Write("Ingrese el ID de la clase a la que desea inscribirse: ");
-        return Console.ReadLine() ?? "";
+        string id = Console.ReadLine() ?? "";
+        
+        Console.Write("Ingrese URL para notificación (Webhook) [Opcional, ENTER para omitir]: ");
+        string url = Console.ReadLine() ?? "";
+        
+        return (id, url);
     }
 
     /// <summary>

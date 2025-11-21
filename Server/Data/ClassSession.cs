@@ -77,5 +77,8 @@ public class ClassSession
         public string Username { get; set; } = "";
         public bool IsCancelled { get; set; } = false;
         public DateTime EnrolledAt { get; set; } = DateTime.Now;
+        
+        public string? WebhookUrl { get; set; }
+        public bool NotificationSent { get; set; } = false;
     }
 }
