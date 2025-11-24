@@ -148,18 +148,22 @@ public class ClassController
     {
         try
         {
-            var classId = _menuManager.PromptClassEnrollment();
+            var (classId, webhookUrl) = _menuManager.PromptClassEnrollment();
 
             if (string.IsNullOrEmpty(classId))
             {
                 PrintMessage.Error("ID de clase no puede estar vacío.");
                 return;
             }
+            
+            string data = string.IsNullOrWhiteSpace(webhookUrl) 
+                ? classId 
+                : $"{classId}|{webhookUrl}";
 
             var request = new ProtocolMessage(
                 ProtocolConstants.HEADER_REQUEST,
                 ProtocolConstants.CMD_ENROLL_CLASS,
-                classId
+                data
             );
 
             setWaitingForResponse(true);

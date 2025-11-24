@@ -1,14 +1,12 @@
-using System.Reflection;
-
-namespace Server.Services;
-
-using Server.Data;
 using System.Collections.Concurrent;
-using System.Collections.Generic; 
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using Common.Protocol;
-using Server.Services; 
+using Server.Data;
+
+namespace Server.Services;
 
 public class ClassService
 {
@@ -21,6 +19,28 @@ public class ClassService
     private readonly object _lockNextId = new object();
 
     private ClassService() { }
+
+    private void PublishClassLog(string evento, string? usuario, string mensaje, string nivel = "INFO", int? classId = null, Guid? clientId = null, Dictionary<string, string>? extra = null)
+    {
+        var metadata = extra != null ? new Dictionary<string, string>(extra) : new Dictionary<string, string>();
+
+        if (clientId.HasValue)
+        {
+            metadata["client_id"] = clientId.Value.ToString();
+        }
+
+        LoggingService.Instance.PublishLog(evento, usuario, mensaje, nivel, classId, metadata);
+    }
+
+    private ProtocolMessage BuildErrorResponse(string evento, string mensaje, Guid clientId, string? usuario = null, int? classId = null, Dictionary<string, string>? extra = null, string nivel = "WARN")
+    {
+        PublishClassLog(evento, usuario, mensaje, nivel, classId, clientId, extra);
+        return new ProtocolMessage(
+            ProtocolConstants.HEADER_RESPONSE,
+            ProtocolConstants.CMD_ERROR,
+            mensaje
+        );
+    }
 
     public ClassSession CreateClass(string name, string description, int maxSeats,
         DateTime startDateTime, int durationMinutes, string? imagePath, string createdBy)
@@ -56,50 +76,48 @@ public class ClassService
             try
             {
                 byte[] imageBytes = Convert.FromBase64String(imageBase64);
-                
-                // Creates the Image folder on the Server if it doesn't exist
-                Directory.CreateDirectory("Images"); 
-                
+
+                // Directorio absoluto dentro del servidor (funciona en Windows y Docker)
+                var imagesDir = Path.Combine(AppContext.BaseDirectory, "Images");
+                Directory.CreateDirectory(imagesDir);
+
                 string fileName = $"{Guid.NewGuid()}.png";
-                imagePath = Path.Combine("Images", fileName);
-                File.WriteAllBytes(imagePath, imageBytes);
+                var fullPath = Path.Combine(imagesDir, fileName);
+                File.WriteAllBytes(fullPath, imageBytes);
+
+                // Guardar SOLO el filename (no la carpeta)
+                imagePath = fileName;
             }
             catch (FormatException)
             {
                 throw new ArgumentException("Formato de imagen Base64 inválido");
             }
         }
-        
+
         var createdClass = CreateClass(name, description, maxSeats, startDateTime, durationMinutes, imagePath, createdBy);
-        
-        Console.WriteLine($"Clase creada: {createdClass.Id} ({createdClass.Name}) por {createdBy}");
+
+        Console.WriteLine($"Clase creada: {createdClass.Id} ({createdClass.Name}) por {createdClass.CreatedBy}");
         return createdClass;
     }
+
 
     public IEnumerable<ClassSession> GetAllClasses() => _classes.Values.ToList();
 
     public ProtocolMessage HandleCreateClass(string data, Guid clientId)
     {
-        // Verificar autenticación
         if (!UserService.Instance.IsUserLoggedIn(clientId))
         {
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_ERROR,
-                "Acción no permitida. Debes iniciar sesión primero."
-            );
+            return BuildErrorResponse("class_create_not_logged", "Acción no permitida. Debes iniciar sesión primero.", clientId);
         }
+
+        string? username = UserService.Instance.GetLoggedInUsername(clientId);
 
         try
         {
             var parts = data.Split('|');
             if (parts.Length < 5)
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Datos insuficientes para crear la clase"
-                );
+                return BuildErrorResponse("class_create_invalid_payload", "Datos insuficientes para crear la clase", clientId, username);
             }
 
             var name = parts[0];
@@ -107,45 +125,55 @@ public class ClassService
 
             if (!int.TryParse(parts[2], out var maxSeats) || maxSeats <= 0)
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Número de cupos inválido"
-                );
+                return BuildErrorResponse(
+                    "class_create_invalid_seats",
+                    "Número de cupos inválido",
+                    clientId,
+                    username,
+                    null,
+                    new Dictionary<string, string> { ["max_seats"] = parts[2] });
             }
+
             if (!DateTime.TryParse(parts[3], out var startDateTime))
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Fecha inválida"
-                );
+                return BuildErrorResponse("class_create_invalid_date", "Fecha inválida", clientId, username);
             }
+
             if (!int.TryParse(parts[4], out var durationMinutes) || durationMinutes <= 0)
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "Duración inválida"
-                );
+                return BuildErrorResponse(
+                    "class_create_invalid_duration",
+                    "Duración inválida",
+                    clientId,
+                    username,
+                    null,
+                    new Dictionary<string, string> { ["duration"] = parts[4] });
             }
 
             var imageBase64 = parts.Length > 5 ? parts[5] : null;
 
-            // Obtener el nombre de usuario actual
-            var username = UserService.Instance.GetLoggedInUsername(clientId);
             if (string.IsNullOrEmpty(username))
             {
-                return new ProtocolMessage(
-                    ProtocolConstants.HEADER_RESPONSE,
-                    ProtocolConstants.CMD_ERROR,
-                    "No se pudo obtener el usuario actual"
-                );
+                return BuildErrorResponse("class_create_missing_user", "No se pudo obtener el usuario actual", clientId, username);
             }
 
             var createdClass = CreateClassWithDetails(
                 name, description, maxSeats, startDateTime, durationMinutes, imageBase64, username
             );
+
+            PublishClassLog(
+                "class_create_success",
+                username,
+                $"Clase '{createdClass.Name}' creada por {username}",
+                "INFO",
+                createdClass.Id,
+                clientId,
+                new Dictionary<string, string>
+                {
+                    ["max_seats"] = maxSeats.ToString(),
+                    ["start"] = startDateTime.ToString("o"),
+                    ["duration"] = durationMinutes.ToString()
+                });
 
             return new ProtocolMessage(
                 ProtocolConstants.HEADER_RESPONSE,
@@ -155,19 +183,11 @@ public class ClassService
         }
         catch (ArgumentException ex)
         {
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_ERROR,
-                ex.Message
-            );
+            return BuildErrorResponse("class_create_argument_error", ex.Message, clientId, username);
         }
         catch (Exception ex)
         {
-            return new ProtocolMessage(
-                ProtocolConstants.HEADER_RESPONSE,
-                ProtocolConstants.CMD_ERROR,
-                $"Error inesperado: {ex.Message}"
-            );
+            return BuildErrorResponse("class_create_error", $"Error inesperado: {ex.Message}", clientId, username, null, null, "ERROR");
         }
     }
 
@@ -184,7 +204,7 @@ public class ClassService
 
             sb.AppendLine($"{c.Id}|{c.Name}|{c.Description}|" +
                           $"{c.StartDateTime:yyyy-MM-dd HH:mm}|{c.DurationMinutes} min|" +
-                          $"{enrolled}/{c.MaxSeats}|{hasImageFlag}");
+                          $"{enrolled}/{c.MaxSeats}|{hasImageFlag}|{c.Link}");
         }
 
         return new ProtocolMessage(
@@ -208,8 +228,12 @@ public class ClassService
 
         try
         {
+            var parts = data.Split('|');
+            string classIdStr = parts[0];
+            string? webhookUrl = parts.Length > 1 ? parts[1] : null;
+
             // Parsear el ID de la clase
-            if (!int.TryParse(data, out var classId))
+            if (!int.TryParse(classIdStr, out var classId)) // Usar classIdStr
             {
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
@@ -268,7 +292,13 @@ public class ClassService
                 // Inscribir al usuario de forma atómica
                 targetClass.EnrollUser(username);
 
-                Console.WriteLine($"Usuario '{username}' inscrito en clase '{targetClass.Name}' (ID: {targetClass.Id})");
+                var enrollment = targetClass.Enrollments.FirstOrDefault(e => e.Username == username && !e.IsCancelled);
+                if (enrollment != null)
+                {
+                    enrollment.WebhookUrl = webhookUrl;
+                }
+                
+                Console.WriteLine($"Usuario '{username}' inscrito en clase '{targetClass.Name}' con Webhook: {webhookUrl ?? "N/A"}");
 
                 return new ProtocolMessage(
                     ProtocolConstants.HEADER_RESPONSE,
@@ -878,37 +908,74 @@ public class ClassService
     
     public string GetClassImageAsBase64(int classId)
     {
-        // 1. Search for the class
         if (!_classes.TryGetValue(classId, out var targetClass))
-        {
             throw new ArgumentException("Clase no encontrada");
-        }
 
-        // 2. Verify if the class has an image associated
         if (string.IsNullOrEmpty(targetClass.ImagePath))
-        {
             throw new InvalidOperationException("Esta clase no tiene una imagen asociada.");
-        }
-        
-        // 3. Read the file and convert it to Base64
+
         byte[]? imageBytes = null;
-        
-        // Try to read as embedded resource first (for old images)
+
+        // Embedded resource (viejas imágenes)
         if (targetClass.ImagePath.StartsWith("Server.Images."))
         {
             imageBytes = ReadEmbeddedResource(targetClass.ImagePath);
         }
-        // Try to read as file path (for new images)
-        else if (File.Exists(targetClass.ImagePath))
+        else
         {
-            imageBytes = File.ReadAllBytes(targetClass.ImagePath);
+            var imagesDir = "/app/Images"; // Docker
+            if (!Directory.Exists(imagesDir))
+            {
+                // Modo local (Rider/Windows)
+                imagesDir = Path.Combine(AppContext.BaseDirectory, "Images");
+            }
+
+            var fileName = Path.GetFileName(targetClass.ImagePath);
+            var fullPath = Path.Combine(imagesDir, fileName);
+
+            if (File.Exists(fullPath))
+            {
+                imageBytes = File.ReadAllBytes(fullPath);
+            }
+
         }
 
-        if (imageBytes == null)
+        if (imageBytes == null || imageBytes.Length == 0)
         {
-            throw new FileNotFoundException($"El archivo de la imagen '{targetClass.ImagePath}' no se encontró en el servidor.");
+            throw new FileNotFoundException(
+                $"El archivo de la imagen '{targetClass.ImagePath}' no se encontró o está vacío. " +
+                $"Buscado en: {Path.Combine(AppContext.BaseDirectory, "Images")}"
+            );
         }
+
         return Convert.ToBase64String(imageBytes);
+    }
+
+
+    public ClassSession? GetClassByLink(string link)
+    {
+        if (string.IsNullOrWhiteSpace(link))
+        {
+            return null;
+        }
+
+        return _classes.Values.FirstOrDefault(c =>
+            c.Link.Equals(link, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public bool IsUserEnrolledInClass(int classId, string username)
+    {
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return false;
+        }
+
+        if (!_classes.TryGetValue(classId, out var targetClass))
+        {
+            return false;
+        }
+
+        return targetClass.IsEnrolled(username);
     }
     
     public void CreateClassFromData(

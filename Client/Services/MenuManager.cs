@@ -143,12 +143,13 @@ public class MenuManager
             foreach (var line in classLines)
             {
                 var parts = line.Split('|');
-                if (parts.Length < 7) continue;
+                if (parts.Length < 8) continue;
 
-                // Format: 0:ID|1:Nombre|2:Desc|3:Fecha|4:Dur|5:Cupos|6:TieneImagen
+                // Format: 0:ID|1:Nombre|2:Desc|3:Fecha|4:Dur|5:Cupos|6:TieneImagen|7:Link
                 Console.WriteLine($"ID: {parts[0]} - {parts[1]} ({parts[5]})");
                 Console.WriteLine($"   Descripción: {parts[2]}");
                 Console.WriteLine($"   Inicio: {parts[3]} ({parts[4]})");
+                Console.WriteLine($"   Link: {parts[7]}");
 
                 // --- If it has an image available for download ---
                 if (parts[6] == "1")
@@ -173,13 +174,18 @@ public class MenuManager
     }
 
     /// <summary>
-    /// Prompts for class enrollment
+    /// Prompts for class enrollment with optional Webhook
     /// </summary>
-    /// <returns>Class ID as string</returns>
-    public string PromptClassEnrollment()
+    /// <returns>Tuple with Class ID and Webhook URL</returns>
+    public (string classId, string webhookUrl) PromptClassEnrollment()
     {
         Console.Write("Ingrese el ID de la clase a la que desea inscribirse: ");
-        return Console.ReadLine() ?? "";
+        string id = Console.ReadLine() ?? "";
+        
+        Console.Write("Ingrese URL para notificación (Webhook) [Opcional, ENTER para omitir]: ");
+        string url = Console.ReadLine() ?? "";
+        
+        return (id, url);
     }
 
     /// <summary>

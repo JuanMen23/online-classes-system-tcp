@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace Client.Services;
 
 /// <summary>
@@ -82,14 +84,23 @@ public class InputValidator
     /// <returns>Base64 encoded image string or empty string if invalid</returns>
     public string ReadImageFile(string imagePath)
     {
-        if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath))
+        if (string.IsNullOrWhiteSpace(imagePath))
         {
             return "";
         }
 
+        string resolvedPath = ResolveImagePath(imagePath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            throw new InvalidOperationException(
+                $"No se encontró el archivo de imagen en '{resolvedPath}'. " +
+                "Verifica la ruta dentro del contenedor cliente o configura CLIENT_UPLOAD_DIR.");
+        }
+
         try
         {
-            byte[] bytes = File.ReadAllBytes(imagePath);
+            byte[] bytes = File.ReadAllBytes(resolvedPath);
 
             if (bytes.Length > MAX_IMAGE_SIZE_BYTES)
             {
@@ -100,7 +111,7 @@ public class InputValidator
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Error leyendo la imagen: {ex.Message}");
+            throw new InvalidOperationException($"Error leyendo la imagen desde '{resolvedPath}': {ex.Message}");
         }
     }
 
@@ -151,5 +162,25 @@ public class InputValidator
     public string FormatCredentials(string username, string password)
     {
         return $"{username}|{password}";
+    }
+
+    private string ResolveImagePath(string imagePath)
+    {
+        if (Path.IsPathRooted(imagePath))
+        {
+            return imagePath;
+        }
+
+        string? uploadDir = Environment.GetEnvironmentVariable("CLIENT_UPLOAD_DIR");
+        if (!string.IsNullOrWhiteSpace(uploadDir))
+        {
+            var combined = Path.Combine(uploadDir, imagePath);
+            if (File.Exists(combined))
+            {
+                return combined;
+            }
+        }
+
+        return Path.Combine(Directory.GetCurrentDirectory(), imagePath);
     }
 }

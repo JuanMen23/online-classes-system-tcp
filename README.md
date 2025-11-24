@@ -93,6 +93,20 @@ Esta arquitectura facilita el mantenimiento, testing y escalabilidad del sistema
 4. **Salida**: Escribir `exit` en el cliente para desconectarse
 5. **Shutdown**: Escribir `shutdown` en el servidor para cerrarlo
 
+## Colección de Postman
+
+El repositorio incluye una colección de Postman para probar el Servidor de Logs (REST API).
+
+**Ubicación:** `postman/LogsServer_Collection.json`
+
+**Documentación:** Ver `postman/README.md` para instrucciones de importación y uso.
+
+La colección incluye ejemplos para:
+- Obtener todos los logs
+- Filtrar por usuario, clase, nivel, evento, fecha, texto
+- Combinar múltiples filtros
+- Agregar logs de prueba
+
 ## Desarrollo del Proyecto
 
 Este proyecto fue desarrollado siguiendo un enfoque iterativo:

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 namespace Server.Services;
 
@@ -33,7 +34,17 @@ public class ClientManager
         if (client != null)
         {
             _connectedClients.TryAdd(client.Id, client);
-            Console.WriteLine($"Cliente conectado. Total: {GetConnectedClientsCount()}");
+            var total = GetConnectedClientsCount();
+            Console.WriteLine($"Cliente conectado. Total: {total}");
+            LoggingService.Instance.PublishLog(
+                "client_connected",
+                "system",
+                $"Cliente conectado ({client.Id})",
+                metadata: new Dictionary<string, string>
+                {
+                    ["client_id"] = client.Id.ToString(),
+                    ["total_connected"] = total.ToString()
+                });
         }
     }
 
@@ -45,10 +56,20 @@ public class ClientManager
     {
         if (client != null)
         {
-            UserService.Instance.LogoutUser(client.Id);
+            UserService.Instance.LogoutUser(client.Id, "connection_closed");
             if (_connectedClients.TryRemove(client.Id, out _))
             {
-                Console.WriteLine($"Cliente desconectado. Total: {GetConnectedClientsCount()}");
+                var total = GetConnectedClientsCount();
+                Console.WriteLine($"Cliente desconectado. Total: {total}");
+                LoggingService.Instance.PublishLog(
+                    "client_disconnected",
+                    "system",
+                    $"Cliente desconectado ({client.Id})",
+                    metadata: new Dictionary<string, string>
+                    {
+                        ["client_id"] = client.Id.ToString(),
+                        ["total_connected"] = total.ToString()
+                    });
             }
         }
     }
@@ -79,6 +100,11 @@ public class ClientManager
             }
 
             Console.WriteLine($"Desconectando {totalClients} clientes...");
+            LoggingService.Instance.PublishLog(
+                "client_disconnect_all",
+                "system",
+                $"Desconectando {totalClients} clientes por cierre del servidor",
+                metadata: new Dictionary<string, string> { ["total"] = totalClients.ToString() });
 
             foreach (var client in clientsToDisconnect)
             {
@@ -93,6 +119,10 @@ public class ClientManager
             }
 
             Console.WriteLine("Todos los clientes desconectados");
+            LoggingService.Instance.PublishLog(
+                "client_disconnect_all_completed",
+                "system",
+                "Todos los clientes fueron desconectados correctamente");
         }
     }
 
