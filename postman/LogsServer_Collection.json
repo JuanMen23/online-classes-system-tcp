@@ -1,0 +1,348 @@
+{
+	"info": {
+		"_postman_id": "logs-server-collection",
+		"name": "Logs Server API",
+		"description": "Colección de Postman para probar el Servidor de Logs del Sistema de Clases Online.\n\n**Base URL:** http://localhost:5001\n\n**Endpoints disponibles:**\n- GET /api/logs - Obtener logs con filtros opcionales\n- POST /api/logs/test - Agregar un log de prueba\n\n**Filtros disponibles para GET /api/logs:**\n- usuario: Filtrar por nombre de usuario\n- evento: Filtrar por tipo de evento\n- nivel: Filtrar por nivel (INFO, WARNING, ERROR)\n- claseId: Filtrar por ID de clase\n- fechaDesde: Filtrar desde fecha (formato ISO 8601)\n- fechaHasta: Filtrar hasta fecha (formato ISO 8601)\n- contiene: Buscar texto en mensajes\n- limit: Límite de resultados (default: 100)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Obtener todos los logs",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs"
+					]
+				},
+				"description": "Obtiene todos los logs almacenados en el servidor (hasta el límite por defecto de 100)."
+			},
+			"response": []
+		},
+		{
+			"name": "2. Filtrar por usuario",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs?usuario=romi",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs"
+					],
+					"query": [
+						{
+							"key": "usuario",
+							"value": "romi",
+							"description": "Nombre de usuario"
+						}
+					]
+				},
+				"description": "Obtiene todos los logs relacionados con un usuario específico."
+			},
+			"response": []
+		},
+		{
+			"name": "3. Filtrar por clase",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs?claseId=1",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs"
+					],
+					"query": [
+						{
+							"key": "claseId",
+							"value": "1",
+							"description": "ID de la clase"
+						}
+					]
+				},
+				"description": "Obtiene todos los logs relacionados con una clase específica."
+			},
+			"response": []
+		},
+		{
+			"name": "4. Filtrar por nivel",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs?nivel=INFO",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs"
+					],
+					"query": [
+						{
+							"key": "nivel",
+							"value": "INFO",
+							"description": "Nivel del log: INFO, WARNING, ERROR"
+						}
+					]
+				},
+				"description": "Filtra logs por nivel de severidad."
+			},
+			"response": []
+		},
+		{
+			"name": "5. Filtrar por evento",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs?evento=login",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs"
+					],
+					"query": [
+						{
+							"key": "evento",
+							"value": "login",
+							"description": "Tipo de evento (ej: login, class_create, class_enroll)"
+						}
+					]
+				},
+				"description": "Filtra logs por tipo de evento."
+			},
+			"response": []
+		},
+		{
+			"name": "6. Filtrar por rango de fechas",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs?fechaDesde=2025-01-20T00:00:00Z&fechaHasta=2025-01-20T23:59:59Z",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs"
+					],
+					"query": [
+						{
+							"key": "fechaDesde",
+							"value": "2025-01-20T00:00:00Z",
+							"description": "Fecha de inicio (ISO 8601)"
+						},
+						{
+							"key": "fechaHasta",
+							"value": "2025-01-20T23:59:59Z",
+							"description": "Fecha de fin (ISO 8601)"
+						}
+					]
+				},
+				"description": "Filtra logs por rango de fechas. Usa formato ISO 8601."
+			},
+			"response": []
+		},
+		{
+			"name": "7. Buscar texto en mensajes",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs?contiene=clase",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs"
+					],
+					"query": [
+						{
+							"key": "contiene",
+							"value": "clase",
+							"description": "Texto a buscar en los mensajes"
+						}
+					]
+				},
+				"description": "Busca logs que contengan un texto específico en el mensaje."
+			},
+			"response": []
+		},
+		{
+			"name": "8. Limitar cantidad de resultados",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs?limit=10",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs"
+					],
+					"query": [
+						{
+							"key": "limit",
+							"value": "10",
+							"description": "Número máximo de resultados a retornar"
+						}
+					]
+				},
+				"description": "Limita la cantidad de logs retornados."
+			},
+			"response": []
+		},
+		{
+			"name": "9. Filtros combinados (usuario + clase + nivel)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs?usuario=romi&claseId=1&nivel=INFO",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs"
+					],
+					"query": [
+						{
+							"key": "usuario",
+							"value": "romi"
+						},
+						{
+							"key": "claseId",
+							"value": "1"
+						},
+						{
+							"key": "nivel",
+							"value": "INFO"
+						}
+					]
+				},
+				"description": "Ejemplo de filtros combinados. Todos los filtros son opcionales y se pueden combinar de cualquier manera."
+			},
+			"response": []
+		},
+		{
+			"name": "10. Filtros combinados (evento + fecha + contiene)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/logs?evento=class_create&fechaDesde=2025-01-20T00:00:00Z&contiene=creada",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs"
+					],
+					"query": [
+						{
+							"key": "evento",
+							"value": "class_create"
+						},
+						{
+							"key": "fechaDesde",
+							"value": "2025-01-20T00:00:00Z"
+						},
+						{
+							"key": "contiene",
+							"value": "creada"
+						}
+					]
+				},
+				"description": "Otro ejemplo de filtros combinados mostrando la flexibilidad del sistema."
+			},
+			"response": []
+		},
+		{
+			"name": "11. Agregar log de prueba",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"timestamp\": \"2025-01-20T14:30:00Z\",\n    \"usuario\": \"testuser\",\n    \"evento\": \"test_event\",\n    \"nivel\": \"INFO\",\n    \"mensaje\": \"Este es un log de prueba\",\n    \"claseId\": 1,\n    \"metadata\": {\n        \"test\": \"true\"\n    }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/logs/test",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs",
+						"test"
+					]
+				},
+				"description": "Agrega un log de prueba al servidor. Útil para testing y demostración.\n\n**Campos requeridos:**\n- evento: Tipo de evento\n- mensaje: Mensaje del log\n\n**Campos opcionales:**\n- timestamp: Fecha/hora (default: ahora)\n- usuario: Usuario relacionado\n- nivel: INFO, WARNING, ERROR (default: INFO)\n- claseId: ID de clase relacionada\n- metadata: Objeto JSON con metadatos adicionales"
+			},
+			"response": []
+		},
+		{
+			"name": "12. Agregar log de prueba (mínimo)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"evento\": \"test_minimal\",\n    \"mensaje\": \"Log de prueba con campos mínimos\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/logs/test",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"logs",
+						"test"
+					]
+				},
+				"description": "Ejemplo de log de prueba con solo los campos requeridos."
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5001",
+			"type": "string"
+		}
+	]
+}
+

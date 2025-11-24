@@ -83,3 +83,22 @@ docker-compose down
 docker-compose up -d
 ```
 
+## Colección de Postman
+
+El repositorio incluye una colección de Postman para probar el Servidor de Logs.
+
+**Ubicación:** `postman/LogsServer_Collection.json`
+
+**Cómo usar:**
+1. Importar la colección en Postman (File → Import)
+2. Asegurarse de que el servidor de logs esté corriendo
+3. La variable `base_url` está configurada a `http://localhost:5001`
+
+**Documentación completa:** Ver `postman/README.md`
+
+La colección incluye ejemplos para:
+- Obtener todos los logs
+- Filtrar por usuario, clase, nivel, evento, fecha, texto
+- Combinar múltiples filtros
+- Agregar logs de prueba
+
