@@ -1,4 +1,4 @@
-# Obligatorio Redes 1 - Sistema de Clases Online
+# Sistema de Clases Online
 
 ## Descripción del Proyecto
 
